@@ -1,0 +1,16 @@
+session Formalismos = HOL +
+  options [document = pdf, document_output = "output"]
+  theories
+    "Relations"
+    "Reduction_Systems"
+    "Partial_Orders"
+    "Multisets"
+    "Multisets_WF"
+    "Commutation"
+    "Terms"
+    "Term_Rewriting"
+    "Unification"
+    "Confluence"
+    "Parallel_Closed"
+  document_files
+    "root.tex"

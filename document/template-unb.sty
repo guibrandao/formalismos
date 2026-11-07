@@ -1,0 +1,43 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{template-unb}[2026/11/03 Modelo de documentos da UnB]
+
+\RequirePackage{geometry}
+\RequirePackage{graphicx}
+\RequirePackage{fancyhdr}
+\RequirePackage{ragged2e}
+
+\geometry{a4paper,left=2cm,right=2cm,top=2.5cm,bottom=2cm,headsep=0.4cm}
+\setlength{\headheight}{29pt}
+\setlength{\footskip}{0.8cm}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\fancyhead[L]{\includegraphics[width=2.8cm]{as_bas_cor.pdf}}
+\fancyhead[R]{Universidade de Brasília \\ Departamento de Matemática}
+\fancyfoot{}
+\fancyfoot[R]{\thepage}
+\newcommand{\DisciplinaDocumento}{}
+\fancyfoot[L]{\DisciplinaDocumento}
+\renewcommand{\headrule}{%
+  \ifnum\value{page}=1
+    \hrule height\headrulewidth width\headwidth
+    \vskip 1pt
+    \hrule height\headrulewidth width\headwidth
+  \else
+    \hrule height\headrulewidth width\headwidth
+  \fi}
+\pagestyle{fancy}
+
+\newcommand{\Titulo}[3]{%
+  \gdef\DisciplinaDocumento{#2}%
+  \vspace*{-0.9cm}%
+  \begin{center}
+    {\LARGE\bfseries #1\par}
+    \vspace{0.1cm}
+    {\Large #2\par}
+    \vspace{0.1cm}
+    {\large #3\par}
+  \end{center}
+  \vspace{-0.15cm}
+  \noindent\rule{\textwidth}{0.4pt}
+  \vspace{0pt}
+}

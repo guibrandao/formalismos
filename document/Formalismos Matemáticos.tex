@@ -1,0 +1,182 @@
+\documentclass[a4paper]{article}
+
+
+%-----------------------PACKAGES----------------------------------------
+
+
+\usepackage[brazilian]{babel}
+%\usepackage[latin1]{inputenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lipsum}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{multirow}
+\usepackage{wrapfig}
+%\usepackage{natbib}
+\usepackage{footnote}
+\usepackage{booktabs, ctable}
+\usepackage{enumerate}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amssymb}
+\usepackage{indentfirst}
+\usepackage{cleveref}
+\usepackage{template-unb}
+\graphicspath{{img/}}
+
+
+%-----------------------MACROS-------------------------------------------
+\newcommand{\vars}[1]{\mathcal{V}ars(#1)}
+\newcommand{\pos}[1]{\mathcal{P}os(#1)}
+\newcommand{\terms}[2]{\mathcal{T}(#1, #2)}
+\newcommand{\termpos}[1]{|_{#1}}
+\newcommand{\subpos}[2]{[#1]_{#2}}
+\newcommand{\dom}[1]{\mathcal{D}om(#1)}
+\newcommand{\parared}[2]{\rightrightarrows_{#1}^{#2}}
+
+
+
+
+
+%-----------------------THEOREMS----------------------------------------
+\theoremstyle{definition}
+\newtheorem{definition}{Definição}
+\theoremstyle{plain}
+\newtheorem{proposition}[definition]{Proposição}
+\newtheorem{theorem}[definition]{Teorema}
+\newtheorem{lemma}[definition]{Lema}
+\newtheorem{corollary}[definition]{Corolário}
+\newtheorem{fact}[definition]{Fato}
+\crefname{definition}{definição}{definições}
+\Crefname{definition}{Definição}{Definições}
+\crefname{proposition}{proposição}{proposições}
+\Crefname{proposition}{Proposição}{Proposições}
+\crefname{theorem}{teorema}{teoremas}
+\Crefname{theorem}{Teorema}{Teoremas}
+\crefname{lemma}{lema}{lemas}
+\Crefname{lemma}{Lema}{Lemas}
+\crefname{corollary}{corolário}{corolários}
+\Crefname{corollary}{Corolário}{Corolários}
+\crefname{fact}{fato}{fatos}
+\Crefname{fact}{Fato}{Fatos}
+\renewenvironment{proof}{{\bfseries \noindent Demonstração:}}{\qed}
+\renewcommand{\qedsymbol}{$\blacksquare$}
+
+%-----------------------DOCUMENT----------------------------------------
+
+
+
+\begin{document}
+	\Titulo{Avaliação 1}{Formalismos Matemáticos da Computação}{Guilherme Borges Brandão}
+
+\vspace{-0.5cm}
+\begin{abstract}
+		Este documento tem como objetivo providenciar as provas formais do Teorema 6.3.10 e dos Lemas 6.4.4 e 6.4.8 do livro {\it Term Rewriting and All That}, de Franz Baader e Tobias Nipkow, como parte da Avaliação 1 da disciplina {\it Formalismos Matemáticos da Computação}.
+	\end{abstract}
+
+	\begin{definition}
+		Sejam \(\Sigma\) uma assinatura, \(X\) um conjunto de variáveis disjuntas de \(\Sigma\) e \(s,t\in \terms{\Sigma}{X}\).
+		\begin{enumerate}
+			\item O {\em conjunto de posições} de \(s\) é definido recursivamente como
+				\[\pos{s} := \begin{cases}
+					\{\epsilon\} & \text{se } s \in X \\
+					\{\epsilon\} \cup \bigcup_{i=1}^{n}\{i p \mid p \in \pos{s_i}\} & \text{se } s = f(s_1, \ldots, s_n)
+				\end{cases}\]
+				onde \(\epsilon\) é a {\em posição raiz} de \(s\), e a função ou símbolo de variável nessa posição é chamado de símbolo raíz. A {\em ordem de prefixo} definida como 
+					\[p \leq q \text{ sse exuste } p' \text{ such tal que } pp' = q\]
+				é uma ordem parcial sobre \(\pos{s}\). A posição \(p\) é dita {\em acima} de \(q\) se \(p < q\) e {\em abaixo} de \(q\) se \(p > q\). Dizemos que duas posições $p$ e $q$ de um termo $t$ são paralelas se não existe uma posição $r$ tal que \(r < p\) e \(r < q\) e denotamos por \(p \parallel q\).
+			\item O {\em tamanho} de \(s\) é definido como \(|s| := |\pos{s}|\).
+			\item O {\em subtermo} de \(s\) na posição \(p\) é definido recursivamente como
+				\[s\termpos{p} := \begin{cases}
+					s & \text{se } p = \epsilon \\
+					s_i\termpos{p'} & \text{se } s = f(s_1, \ldots, s_n) \text{ e } p = ip' \text{ para algum } i \in \{1, \ldots, n\}.
+				\end{cases}\]
+			\item Para \(p\in \pos{s}\), denotamos por \(s\subpos{t}{p}\) o termo obtido substituindo o subtermo de \(s\) na posição \(p\) pelo termo \(t\). Formalmente, temos
+				\[s\subpos{t}{p} := \begin{cases}
+					t & \text{se } p = \epsilon \\
+					f(s_1, \ldots, s_{i-1}, s_i\subpos{t}{p'}, s_{i+1}, \ldots, s_n) & \text{se } s = f(s_1, \ldots, s_n).
+				\end{cases}\]
+			\item Por \(\vars{s}\), denotamos o conjunto de variáveis que ocorrem em \(s\).
+				\[\vars{s} := \{x \in X \mid \exists p \in \pos{s} \text{ tal que } s\termpos{p} = x\}\]
+			Dizemos que \(p\in\pos{s}\) é uma {\em posição de variável} se \(s\termpos{p}\) é uma variável.
+		\end{enumerate}
+	\end{definition}
+
+	
+
+	\begin{lemma}
+		\label{lemma:paralelo-subst1}
+		Sejam \(s, t, r\) termos e \(p,q\in \pos{s}\) palavras sobre os inteiros positivos. 
+		\begin{enumerate}
+			\item Se \(pq\in \pos{s}\), então \(s\pos{pq} = (s\pos{p})\pos{q}\).
+			\item Se \(p\in\pos{s}\) e \(q\in\pos{t}\), então
+				\[\begin{aligned}
+					(s\subpos{t}{p})\termpos{pq} & = t \termpos{q} \\
+				    (s\subpos{t}{p})\subpos{r}{pq} & = s\subpos{t\subpos{r}{q}}{p}
+				\end{aligned}\]
+			\item Se \(pq\in \pos{s}\), então
+				\[\begin{aligned}
+					(s\subpos{t}{pq})\termpos{p} & = (s\termpos{p})\subpos{t}{q}\\
+				    (s\subpos{t}{pq})\subpos{r}{p} & = s\subpos{r}{p}
+				\end{aligned}\]
+			\item Se \(p \parallel q\), então
+				\[\begin{aligned}
+					(s\subpos{t}{p})\termpos{q} & = s\termpos{q} \\
+				    (s\subpos{t}{p})\subpos{r}{q} & = (s\subpos{r}{q})\subpos{t}{p}
+				\end{aligned}\]
+		\end{enumerate}
+	\end{lemma}
+	\begin{proof}
+	A prova é por indução na posição \(p\) seguida de uma análise de casos na estrutura de \(s\).
+	\end{proof}
+
+	\begin{definition}
+		Sejam \(\Sigma\) uma assinatura e \(V\) um conjunto enumerável de varíaveis. Uma {\em \(\terms{\Sigma}{V}\)-substituição} é uma função \(\sigma \colon V \to \terms{\Sigma}{V}\) tal que \(\{x \in V \mid \sigma(x) \neq x\}\) é finito. Tal conjunto é chamado de {\em domínio} de \(\sigma\) e denotado por \(\dom{\sigma}\). Se \(\dom{\sigma}=\{x_1, \ldots, x_n\}\), escrevemos \(\sigma = \{x_1 \mapsto \sigma(x_1), \ldots, x_n \mapsto \sigma(x_n)\}\).
+	\end{definition}
+
+	\begin{definition}
+		Um sistema de reescrita de termos é dito ortogonal se ele é linear à esquerda e não possui pares críticos.
+	\end{definition}
+
+	\begin{definition}
+		Dizemos que um conjunto de posições \(P\) de um termo \(t\) é paralelo se \(p \parallel q\) ou \(p = q\) para todo \(p, q \in P\). Seja \(P\) um conjunto de posições paralelo. Dado \(t_p\) para cada \(p \in P\) definimos a notação
+			\[s\subpos{t_p}{p\in P} := s\subpos{t_{p_1}}{p_1}\ldots \subpos{t_{p_n}}{p_n}.\]
+		Como cada \(p_i\) é paralelo entre si, a ordem das substituições não importa.
+
+		Se para cada \(p \in P\) temos \(l_p \rightarrow r_p\in R\) e uma substituição \(\sigma_p\) onde \(s\termpos{p} = \sigma_p l_p\), escrevemos
+			\[s \parared{R}{P} s\subpos{\sigma_p r_p}{p\in P}\]
+		e chamamos isso de um passo de redução paralela. As anotações de \(R\) e \(P\) podem ser omitidas quando não houver ambiguidade.
+	\end{definition}
+
+	Uma consequência imediata da definição acima é
+
+	\begin{fact}
+	\(\rightarrow \ \subset \ \parared{}{} \ \subset \ \rightarrow^*\)
+	\end{fact}
+	\begin{proof}
+		\begin{enumerate}
+			\item Primeiro mostremos que \(\rightarrow \ \subset \ \parared{}{}\). Suponha \(s\rightarrow t\), o objetivo é mostrar que \(s \parared{}{} t\). Como \(s\rightarrow t\), existe uma posição \(p\) tal que \(s\termpos{p} = \sigma l\) e \(t = s\subpos{\sigma r}{p}\) para alguma regra \(l \rightarrow r \in R\) e substituição \(\sigma\). Temos que conjunto \(\{p\}\) é paralelo. Portanto, temos
+				\[s \parared{R}{\{p\}} s\subpos{\sigma r}{p} = t.\]
+
+			\item Agora, vamos mostrar que \(\parared{}{} \ \subset \ \rightarrow^*\). Suponha \(s \parared{R}{P} t\). Disso segue que existe um conjunto de posições paralelo \(P = \{p_1, p_2, \ldots, p_n\}\) e para cada \(p_i \in P\) existe uma regra \(l_i \rightarrow r_i \in R\) e uma substituição \(\sigma_i\) tal que \(s\termpos{p_i} = \sigma_i l_i\), com 
+				\[t = s\subpos{\sigma_{1} r_{1}}{p_1}\ldots \subpos{\sigma_{n} r_{n}}{p_n}.\]
+			Como \(P\) é paralelo, cada redução unitária pode ser realizada em qualquer ordem, sem alterar os subtermos das outras posições (\Cref{lemma:paralelo-subst1}). Logo, temos a seguinte cadeia de reduções:
+				\begin{align*}
+					s &= s\subpos{\sigma_{1} l_{1}}{p_1}\ldots \subpos{\sigma_{n} l_{n}}{p_n} \\
+					&\rightarrow s\subpos{\sigma_{1} r_{1}}{p_1}\subpos{\sigma_{2} l_{2}}{p_2}\ldots \subpos{\sigma_{n} l_{n}}{p_n} \\
+					&\rightarrow s\subpos{\sigma_{1} r_{1}}{p_1}\subpos{\sigma_{2} r_{2}}{p_2}\ldots \subpos{\sigma_{n} l_{n}}{p_n} \\
+					&\vdots \\
+					&\rightarrow s\subpos{\sigma_{1} r_{1}}{p_1}\ldots \subpos{\sigma_{n} r_{n}}{p_n} = t.
+				\end{align*}
+			Ou seja, \(s \rightarrow^* t\).
+		\end{enumerate}
+	\end{proof}
+
+
+
+\end{document}

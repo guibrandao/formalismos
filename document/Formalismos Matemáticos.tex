@@ -175,7 +175,7 @@
 	\end{definition}
 
 	\begin{definition}[\isa{diamond}]
-		Seja \(\rightarrow\) uma relação binária. Dizemos que \(\rightarrow\) é {\em confluente} se, sempre que \(t_1 \mathrel{{}^*{\leftarrow}} s \rightarrow^* t_2\), existe \(u\) com \(t_1 \rightarrow^* u \mathrel{{}^*{\leftarrow}} t_2\). Dizemos que \(\rightarrow\) tem a {\em propriedade do diamante} se, sempre que \(t_1 \leftarrow s \rightarrow t_2\), existe \(u\) com \(t_1 \rightarrow u \leftarrow t_2\).
+		Seja \(\rightarrow\) uma relação binária. Dizemos que \(\rightarrow\) é {\em confluente} se, para todo \(s, t_1, t_2\) tais que \(t_1 \mathrel{{}^*{\leftarrow}} s \rightarrow^* t_2\), existe \(u\) com \(t_1 \rightarrow^* u \mathrel{{}^*{\leftarrow}} t_2\). Dizemos que \(\rightarrow\) tem a {\em propriedade do diamante} se, sempre que \(t_1 \leftarrow s \rightarrow t_2\), existe \(u\) com \(t_1 \rightarrow u \leftarrow t_2\).
 	\end{definition}
 
 	\begin{lemma}[2.4.2; \isa{diamond_between_imp_confluent}]
@@ -191,7 +191,7 @@
 	\end{definition}
 
 	\begin{definition}[6.2.1; \isa{CP}]
-		Sejam \(l_1 \rightarrow r_1\) e \(l_2 \rightarrow r_2\) variantes (renomeações de variáveis) de regras \(\rho_1, \rho_2 \in R\) sem variáveis em comum, \(p \in \pos{l_1}\) tal que \(l_1\termpos{p}\) não é uma variável, e \(\theta\) um unificador mais geral de \(l_1\termpos{p} \stackrel{?}{=} l_2\). Excluindo o caso \(p = \epsilon\) e \(\rho_1 = \rho_2\), o par
+		Sejam \(l_1 \rightarrow r_1\) e \(l_2 \rightarrow r_2\) variantes (renomeações de variáveis) de regras de \(R\) sem variáveis em comum, \(p \in \pos{l_1}\) tal que \(l_1\termpos{p}\) não é uma variável, e \(\theta\) um unificador mais geral de \(l_1\termpos{p} \stackrel{?}{=} l_2\). Excluindo o caso \(p = \epsilon\) e \(l_1 \rightarrow r_1 = l_2 \rightarrow r_2\), o par
 			\[\langle \theta r_1,\ (\theta l_1)\subpos{\theta r_2}{p} \rangle\]
 		é um {\em par crítico} de \(R\). O conjunto dos pares críticos de \(R\) é denotado por \(\CP{R}\).
 	\end{definition}
@@ -204,7 +204,7 @@
 			\[\delta u = \sigma_1 r_1 \quad\text{e}\quad \delta v = (\sigma_1 l_1)\subpos{\sigma_2 r_2}{p}.\]
 	\end{lemma}
 	\begin{proof}
-		Tome uma variante \(l_2' \rightarrow r_2'\) de \(l_2 \rightarrow r_2\) sem variáveis em comum com \(l_1 \rightarrow r_1\), digamos \(l_2 = \pi l_2'\) e \(r_2 = \pi r_2'\). Seja \(\sigma\) a substituição que coincide com \(\sigma_1\) em \(\vars{l_1} \cup \vars{r_1}\) e com \(\sigma_2 \circ \pi\) nas demais variáveis. Então \(\sigma\) unifica \(l_1\termpos{p}\) e \(l_2'\), logo existe um unificador mais geral \(\theta\) e uma substituição \(\delta\) com \(\sigma = \delta \circ \theta\). O par \(\langle u, v\rangle := \langle \theta r_1, (\theta l_1)\subpos{\theta r_2'}{p}\rangle\) é crítico, e
+		Podemos supor sem perda de generalidade que \(l_2 \rightarrow r_2\) nao possui variáveis em comum com \(l_1 \rightarrow r_1\). Seja \(\sigma\) a substituição que coincide com \(\sigma_1\) em \(\vars{l_1} \cup \vars{r_1}\) e com \(\sigma_2\) nas demais variáveis. Então \(\sigma\) unifica \(l_1\termpos{p}\) e \(l_2\), logo existe um unificador mais geral \(\theta\) e uma substituição \(\delta\) com \(\sigma = \delta \circ \theta\). O par \(\langle u, v\rangle := \langle \theta r_1, (\theta l_1)\subpos{\theta r_2}{p}\rangle\) é crítico, e
 			\[\delta u = \sigma r_1 = \sigma_1 r_1, \qquad \delta v = (\sigma l_1)\subpos{\sigma r_2'}{p} = (\sigma_1 l_1)\subpos{\sigma_2 r_2}{p}. \qedhere\]
 	\end{proof}
 
@@ -256,12 +256,24 @@
 
 	\begin{lemma}[\isa{par_rstep_at_nested}, \isa{par_rstep_replace_at_set}]
 		\label{lemma:combine}
-		Sejam \(Q \subseteq \pos{s}\) paralelo e, para cada \(q \in Q\), \(s\termpos{q} \parared{}{P_q} u_q\). Então
-			\[s \parared{}{P} s\subpos{u_q}{q \in Q}, \qquad P := \{qp \mid q \in Q,\ p \in P_q\}.\]
+		Seja \(Q \subseteq \pos{s}\) um conjunto paralelo. Suponha que, para cada \(q \in Q\), o subtermo \(s\termpos{q}\) dá um passo de redução paralela \(s\termpos{q} \parared{}{P_q} u_q\), onde \(P_q \subseteq \pos{s\termpos{q}}\) é o conjunto paralelo de posições (relativas a \(s\termpos{q}\)) em que esse passo contrai redexes. Então
+			\[s \parared{}{P} s\subpos{u_q}{q \in Q}, \qquad P := \{qp \mid q \in Q,\ p \in P_q\},\]
+		isto é, \(P\) é a união dos conjuntos \(P_q\), cada um deslocado pelo prefixo \(q\) para tornar-se um conjunto de posições de \(s\).
 	\end{lemma}
 	\begin{proof}
-		Duas posições \(qp, q'p'\) de \(P\) são paralelas: se \(q \neq q'\), porque \(q \parallel q'\); se \(q = q'\), porque \(P_q\) é paralelo. Para \(qp \in P\), \(s\termpos{qp} = (s\termpos{q})\termpos{p} = \sigma l\), onde \(\sigma l \to \sigma r\) é o redex contraído em \(p\) pelo passo \(s\termpos{q} \parared{}{P_q} u_q\). Finalmente, fazendo primeiro as substituições abaixo de cada \(q\),
-			\[s\subpos{\sigma_{qp} r_{qp}}{qp \in P} = s\subpos{(s\termpos{q})\subpos{\sigma_{qp} r_{qp}}{p \in P_q}}{q \in Q} = s\subpos{u_q}{q \in Q}. \qedhere\]
+		Primeiro mostremos que \(P\) é paralelo. Sejam \(qp, q'p' \in P\) distintas. Há duas possibilidades para \(qp\) e \(q'p'\) serem paralelas:
+		\begin{itemize}
+			\item \(q \neq q'\): como \(Q\) é paralelo, \(q \parallel q'\), e portanto \(qp \parallel q'p'\);
+			\item \(q = q'\): então \(p \neq p'\), pois caso contrário teríamos \(qp = q'p'\). Assim, como \(P_q\) é paralelo, \(p \parallel p'\); logo \(qp \parallel qp'\).
+		\end{itemize}
+		Agora, para \(qp \in P\), seja \(\sigma_{qp} l_{qp} \to \sigma_{qp} r_{qp}\) o redex contraído na posição \(p\) pelo passo \(s\termpos{q} \parared{}{P_q} u_q\); então \(s\termpos{qp} = (s\termpos{q})\termpos{p} = \sigma_{qp} l_{qp}\) e \(u_q = (s\termpos{q})\subpos{\sigma_{qp} r_{qp}}{p \in P_q}\).
+
+		Como \(P\) é paralelo e \(s\termpos{qp} = \sigma_{qp} l_{qp}\) para todo \(qp \in P\), pela definição de redução paralela temos
+			\[s \parared{}{P} s\subpos{\sigma_{qp} r_{qp}}{qp \in P}.\]
+		Resta mostrar que esse termo é \(s\subpos{u_q}{q \in Q}\). Para cada \(q \in Q\), as posições \(qp\) com \(p \in P_q\) estão todas abaixo de \(q\), e posições abaixo de \(q\) e de \(q'\) distintos são paralelas. Assim, substituir em \(s\) em todas as posições de \(P\) é o mesmo que substituir, em cada \(q \in Q\), o subtermo \(s\termpos{q}\) pelo termo obtido substituindo nele as posições \(p \in P_q\) (\isa{replace_at_set_nested}):
+			\[s\subpos{\sigma_{qp} r_{qp}}{qp \in P} = s\subpos{(s\termpos{q})\subpos{\sigma_{qp} r_{qp}}{p \in P_q}}{q \in Q}.\]
+		Pela descrição de \(u_q\) acima, \((s\termpos{q})\subpos{\sigma_{qp} r_{qp}}{p \in P_q} = u_q\), e portanto
+			\[s \parared{}{P} s\subpos{\sigma_{qp} r_{qp}}{qp \in P} = s\subpos{u_q}{q \in Q}. \qedhere\]
 	\end{proof}
 
 	\begin{lemma}[6.4.1, 6.4.2; \isa{par_rstep_ctxt}, \isa{par_rstep_subst}, \isa{par_rstep_at_subst}]

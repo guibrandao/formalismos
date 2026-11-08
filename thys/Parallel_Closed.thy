@@ -4,89 +4,7 @@ begin
 
 section \<open>Beyond orthogonality\<close>
 
-text \<open>Baader \& Nipkow, Section 6.4: Huet's Parallel Closure Theorem.
-
-  The book measures a fork \<open>t\<^sub>0 \<^sub>P\<^sub>0\<leftleftarrows> s \<rightrightarrows>\<^sup>P\<^sup>1 t\<^sub>1\<close> by the overlap \<open>m(s, P\<^sub>0, P\<^sub>1)\<close> of the two sets
-  of redex positions (Definition 6.4.6, Lemma 6.4.7). We record instead, in each parallel step,
-  the total size \<open>n\<close> of the contracted redexes, and measure a fork by \<open>min n\<^sub>0 n\<^sub>1\<close>. This
-  quantity behaves exactly as needed in the proof of Theorem 6.4.8: it does not increase when
-  passing to the arguments of a function symbol, and it strictly decreases in the critical
-  case (Case 2) of the proof.\<close>
-
-subsection \<open>Parallel steps weighted by the size of the contracted redexes\<close>
-
-inductive par_w :: "('f, 'v) term rel \<Rightarrow> ('f, 'v) term \<Rightarrow> nat \<Rightarrow> ('f, 'v) term \<Rightarrow> bool"
-  for R where
-  var: "par_w R (Var x) 0 (Var x)"
-| args: "length ss = length ts \<Longrightarrow> length ns = length ts \<Longrightarrow>
-    (\<And>i. i < length ts \<Longrightarrow> par_w R (ss ! i) (ns ! i) (ts ! i)) \<Longrightarrow>
-    par_w R (Fun f ss) (sum_list ns) (Fun f ts)"
-| rule: "(l, r) \<in> R \<Longrightarrow> par_w R (\<sigma> \<cdot> l) (size (\<sigma> \<cdot> l)) (\<sigma> \<cdot> r)"
-
-lemma par_w_refl: "par_w R t 0 t"
-proof (induct t)
-  case (Fun f ts)
-  have "par_w R (Fun f ts) (sum_list (replicate (length ts) 0)) (Fun f ts)"
-    by (rule par_w.args) (auto intro: Fun nth_mem)
-  then show ?case by (simp add: sum_list_replicate)
-qed (rule par_w.var)
-
-lemma par_w_imp_par_rstep: "par_w R s n t \<Longrightarrow> (s, t) \<in> par_rstep R"
-  by (induct rule: par_w.induct) (auto intro: par_rstep.intros)
-
-lemma par_rstep_imp_par_w: "(s, t) \<in> par_rstep R \<Longrightarrow> \<exists>n. par_w R s n t"
-proof (induct rule: par_rstep.induct)
-  case (var x)
-  then show ?case by (blast intro: par_w.var)
-next
-  case (args ss ts f)
-  then have "\<forall>i < length ts. \<exists>n. par_w R (ss ! i) n (ts ! i)" by auto
-  then obtain g where g: "\<And>i. i < length ts \<Longrightarrow> par_w R (ss ! i) (g i) (ts ! i)" by metis
-  have "par_w R (Fun f ss) (sum_list (map g [0..<length ts])) (Fun f ts)"
-    by (rule par_w.args) (use args g in auto)
-  then show ?case by blast
-next
-  case (rule l r \<sigma>)
-  then show ?case by (blast intro: par_w.rule)
-qed
-
-lemma par_rstep_iff_par_w: "(s, t) \<in> par_rstep R \<longleftrightarrow> (\<exists>n. par_w R s n t)"
-  using par_rstep_imp_par_w par_w_imp_par_rstep by metis
-
-lemma sum_list_le_nth:
-  fixes xs ys :: "nat list"
-  shows "length xs = length ys \<Longrightarrow> (\<And>i. i < length ys \<Longrightarrow> xs ! i \<le> ys ! i) \<Longrightarrow>
-    sum_list xs \<le> sum_list ys"
-proof (induct xs ys rule: list_induct2)
-  case (Cons x xs y ys)
-  have "x \<le> y" using Cons.prems[of 0] by simp
-  moreover have "sum_list xs \<le> sum_list ys"
-    using Cons.prems by (intro Cons.hyps) (metis Suc_less_eq length_Cons nth_Cons_Suc)
-  ultimately show ?case by simp
-qed simp
-
-text \<open>The contracted redexes are disjoint subterms, so their total size is bounded by the
-  size of the term.\<close>
-
-lemma par_w_size: "par_w R s n t \<Longrightarrow> n \<le> size s"
-proof (induct rule: par_w.induct)
-  case (args ss ts ns f)
-  have "sum_list ns \<le> sum_list (map size ss)" using args by (intro sum_list_le_nth) auto
-  then show ?case by (simp add: size_list_conv_sum_list)
-qed simp_all
-
-text \<open>Parallel reduction is closed under substitutions (the counterpart of Lemma 6.4.2,
-  which is \<open>par_rstep_subst\<close>) and under contexts (Lemma 6.4.1, cf.\ \<open>par_rstep_ctxt\<close>).\<close>
-
-lemma par_rstep_subst_closed:
-  "(s, t) \<in> par_rstep R \<Longrightarrow> (\<delta> \<cdot> s, \<delta> \<cdot> t) \<in> par_rstep R"
-proof (induct rule: par_rstep.induct)
-  case (args ss ts f)
-  then show ?case by (auto intro!: par_rstep.args)
-next
-  case (rule l r \<sigma>)
-  then show ?case using par_rstep.rule[OF rule, of "\<delta> \<circ>\<^sub>s \<sigma>"] by simp
-qed simp
+text \<open>Baader \& Nipkow, Section 6.4: Huet's Parallel Closure Theorem.\<close>
 
 subsection \<open>Parallel closed systems\<close>
 
@@ -102,210 +20,320 @@ text \<open>A left-linear system all of whose critical pairs are trivial is call
 definition weakly_orthogonal :: "('f, 'v) term rel \<Rightarrow> bool" where
   "weakly_orthogonal R \<longleftrightarrow> left_linear R \<and> (\<forall>(u, v) \<in> CP R. u = v)"
 
+subsection \<open>The overlap of two parallel steps\<close>
+
+text \<open>Definition 6.4.6. For a peak \<open>t\<^sub>0 \<leftleftarrows>\<^sup>P\<^sup>0 s \<rightrightarrows>\<^sup>P\<^sup>1 t\<^sub>1\<close>, the overlap \<open>P\<^sub>0 \<sqinter> P\<^sub>1\<close> consists of the
+  redex positions of each step that lie below (or at) a redex position of the other step, and
+  the size of the overlap is \<open>|s|\<^sub>P\<^sub>0\<^sub>\<sqinter>\<^sub>P\<^sub>1| := \<Sigma>\<^sub>p\<^sub>\<in>\<^sub>P\<^sub>0\<^sub>\<sqinter>\<^sub>P\<^sub>1 |s|\<^sub>p|\<close>.\<close>
+
+definition overlap :: "pos set \<Rightarrow> pos set \<Rightarrow> pos set" where
+  "overlap P\<^sub>0 P\<^sub>1 = {p \<in> P\<^sub>0. \<exists>q \<in> P\<^sub>1. q \<le>\<^sub>p p} \<union> {q \<in> P\<^sub>1. \<exists>p \<in> P\<^sub>0. p \<le>\<^sub>p q}"
+
+definition overlap_size :: "('f, 'v) term \<Rightarrow> pos set \<Rightarrow> pos set \<Rightarrow> nat" where
+  "overlap_size s P\<^sub>0 P\<^sub>1 = (\<Sum>p \<in> overlap P\<^sub>0 P\<^sub>1. term_size (s |_ p))"
+
+lemma overlap_sym: "overlap P\<^sub>0 P\<^sub>1 = overlap P\<^sub>1 P\<^sub>0"
+  unfolding overlap_def by blast
+
+lemma overlap_size_sym: "overlap_size s P\<^sub>0 P\<^sub>1 = overlap_size s P\<^sub>1 P\<^sub>0"
+  unfolding overlap_size_def by (simp add: overlap_sym)
+
+lemma finite_overlap: "P\<^sub>0 \<subseteq> poss s \<Longrightarrow> P\<^sub>1 \<subseteq> poss s \<Longrightarrow> finite (overlap P\<^sub>0 P\<^sub>1)"
+  unfolding overlap_def by (auto intro: finite_subset)
+
+lemma term_size_pos: "0 < term_size t"
+proof -
+  have "[] \<in> poss t" by (cases t) (auto simp: poss.simps(2))
+  then have "poss t \<noteq> {}" by blast
+  then show ?thesis unfolding term_size_def by (simp add: card_gt_0_iff)
+qed
+
+text \<open>The subterms at a parallel set of positions are disjoint parts of the term.\<close>
+
+lemma sum_term_size_parallel:
+  assumes "parallel_set P" and "P \<subseteq> poss t"
+  shows "(\<Sum>p \<in> P. term_size (t |_ p)) \<le> term_size t"
+proof -
+  let ?A = "\<lambda>p. (@) p ` poss (t |_ p)"
+  have fin: "finite P" using assms(2) by (rule finite_subset) simp
+  have card: "card (?A p) = term_size (t |_ p)" for p
+    by (simp add: term_size_def card_image inj_on_def)
+  have disj: "?A p \<inter> ?A q = {}" if "p \<in> P" "q \<in> P" "p \<noteq> q" for p q
+  proof -
+    have "p \<parallel> q" using parallel_setD[OF assms(1) that] .
+    then show ?thesis
+      using prefix_le_cases[of p _ q] unfolding parallel_def by (auto simp: prefix_le_def)
+  qed
+  have "(\<Union>p \<in> P. ?A p) \<subseteq> poss t" using assms(2) poss_subt_at by blast
+  then have "card (\<Union>p \<in> P. ?A p) \<le> term_size t"
+    unfolding term_size_def by (intro card_mono) auto
+  moreover have "card (\<Union>p \<in> P. ?A p) = (\<Sum>p \<in> P. card (?A p))"
+    using fin disj by (intro card_UN_disjoint) auto
+  ultimately show ?thesis using card by simp
+qed
+
+text \<open>Lemma 6.4.7. The size of the overlap is bounded by the total size of the redexes of
+  either step.\<close>
+
+lemma overlap_size_le:
+  assumes P0: "parallel_set P\<^sub>0" "P\<^sub>0 \<subseteq> poss s" and P1: "parallel_set P\<^sub>1" "P\<^sub>1 \<subseteq> poss s"
+  shows "overlap_size s P\<^sub>0 P\<^sub>1 \<le> (\<Sum>p \<in> P\<^sub>0. term_size (s |_ p))"
+proof -
+  define Y where "Y p = {y \<in> overlap P\<^sub>0 P\<^sub>1. p \<le>\<^sub>p y}" for p
+  have fin0: "finite P\<^sub>0" using P0(2) by (rule finite_subset) simp
+  have finY: "finite (Y p)" for p
+    using finite_overlap[OF P0(2) P1(2)] unfolding Y_def by simp
+  have cover: "overlap P\<^sub>0 P\<^sub>1 = (\<Union>p \<in> P\<^sub>0. Y p)"
+    unfolding Y_def overlap_def by (auto intro: prefix_le_refl)
+  have disj: "Y p \<inter> Y p' = {}" if "p \<in> P\<^sub>0" "p' \<in> P\<^sub>0" "p \<noteq> p'" for p p'
+  proof -
+    have "p \<parallel> p'" using parallel_setD[OF P0(1) that] .
+    then show ?thesis using prefix_le_cases unfolding Y_def parallel_def by blast
+  qed
+  have Ypar: "parallel_set (Y p)" if p: "p \<in> P\<^sub>0" for p
+    unfolding parallel_set_def
+  proof (intro ballI)
+    fix y y' assume y: "y \<in> Y p" and y': "y' \<in> Y p"
+    have eq: "z = p" if "z \<in> Y p" "z \<in> P\<^sub>0" for z
+      using that p P0(1) unfolding Y_def parallel_set_def parallel_def by blast
+    have in1: "z \<in> P\<^sub>1" if "z \<in> Y p" "z \<noteq> p" for z
+      using that eq unfolding Y_def overlap_def by blast
+    have same: "z = z'" if z: "z \<in> Y p" "z = p" and z': "z' \<in> Y p" "z' \<noteq> p" for z z'
+    proof -
+      have y'1: "z' \<in> P\<^sub>1" "p \<le>\<^sub>p z'" using in1[OF z'] z'(1) unfolding Y_def by auto
+      have "p = z'"
+      proof (cases "p \<in> P\<^sub>1")
+        case True
+        then show ?thesis using y'1 P1(1) unfolding parallel_set_def parallel_def by blast
+      next
+        case False
+        then obtain q where q: "q \<in> P\<^sub>1" "q \<le>\<^sub>p p" using z unfolding Y_def overlap_def by blast
+        then have "q = z'" using y'1 P1(1) prefix_le_trans
+          unfolding parallel_set_def parallel_def by blast
+        then show ?thesis using q(2) y'1(2) prefix_le_antisym by blast
+      qed
+      then show ?thesis using z(2) by simp
+    qed
+    have "y \<parallel> y' \<or> y = y'" if "y \<noteq> p" "y' \<noteq> p"
+      using in1[OF y that(1)] in1[OF y' that(2)] P1(1) unfolding parallel_set_def by blast
+    then show "y \<parallel> y' \<or> y = y'" using same[OF y _ y'] same[OF y' _ y] by blast
+  qed
+  have Ybound: "(\<Sum>y \<in> Y p. term_size (s |_ y)) \<le> term_size (s |_ p)" if p: "p \<in> P\<^sub>0" for p
+  proof -
+    define X where "X = {x. p @ x \<in> Y p}"
+    have Yp: "Y p = (@) p ` X" unfolding X_def Y_def prefix_le_def by auto
+    have Ypos: "Y p \<subseteq> poss s"
+      using P0(2) P1(2) unfolding Y_def overlap_def by blast
+    have X: "parallel_set X" "X \<subseteq> poss (s |_ p)"
+      unfolding X_def using parallel_set_below[OF Ypar[OF p]] Ypos P0(2) p poss_subt_at by blast+
+    have "(\<Sum>y \<in> Y p. term_size (s |_ y)) = (\<Sum>x \<in> X. term_size (s |_ (p @ x)))"
+      unfolding Yp by (simp add: sum.reindex inj_on_def)
+    also have "\<dots> = (\<Sum>x \<in> X. term_size (s |_ p |_ x))"
+      using Ypos unfolding X_def by (intro sum.cong refl) (auto simp: subt_at_append)
+    also have "\<dots> \<le> term_size (s |_ p)" using X by (rule sum_term_size_parallel)
+    finally show ?thesis .
+  qed
+  have "overlap_size s P\<^sub>0 P\<^sub>1 = (\<Sum>p \<in> P\<^sub>0. \<Sum>y \<in> Y p. term_size (s |_ y))"
+    unfolding overlap_size_def cover using fin0 finY disj by (intro sum.UNION_disjoint) auto
+  also have "\<dots> \<le> (\<Sum>p \<in> P\<^sub>0. term_size (s |_ p))" using Ybound by (intro sum_mono) auto
+  finally show ?thesis .
+qed
+
+text \<open>If one of the steps contracts the redex at the root, every redex of the other step
+  belongs to the overlap.\<close>
+
+lemma overlap_size_root:
+  assumes "P\<^sub>1 \<subseteq> poss s"
+  shows "(\<Sum>p \<in> P\<^sub>1. term_size (s |_ p)) \<le> overlap_size s {[]} P\<^sub>1"
+  unfolding overlap_size_def
+  using assms finite_overlap[of "{[]}" s P\<^sub>1] by (intro sum_mono2) (auto simp: overlap_def)
+
+text \<open>Passing to an outermost position does not increase the size of the overlap.\<close>
+
+lemma overlap_size_outermost:
+  assumes "P\<^sub>0 \<subseteq> poss s" and "P\<^sub>1 \<subseteq> poss s"
+  shows "overlap_size (s |_ q) {p. q @ p \<in> P\<^sub>0} {p. q @ p \<in> P\<^sub>1} \<le> overlap_size s P\<^sub>0 P\<^sub>1"
+proof -
+  let ?O = "overlap {p. q @ p \<in> P\<^sub>0} {p. q @ p \<in> P\<^sub>1}"
+  have sub: "(@) q ` ?O \<subseteq> overlap P\<^sub>0 P\<^sub>1"
+  proof (rule image_subsetI)
+    fix x assume "x \<in> ?O"
+    then consider (a) y where "q @ x \<in> P\<^sub>0" "q @ y \<in> P\<^sub>1" "y \<le>\<^sub>p x"
+      | (b) y where "q @ x \<in> P\<^sub>1" "q @ y \<in> P\<^sub>0" "y \<le>\<^sub>p x"
+      unfolding overlap_def by blast
+    then show "q @ x \<in> overlap P\<^sub>0 P\<^sub>1"
+    proof cases
+      case a
+      then have "q @ y \<le>\<^sub>p q @ x" by (auto simp: prefix_le_def)
+      then show ?thesis using a unfolding overlap_def by blast
+    next
+      case b
+      then have "q @ y \<le>\<^sub>p q @ x" by (auto simp: prefix_le_def)
+      then show ?thesis using b unfolding overlap_def by blast
+    qed
+  qed
+  have pos: "q @ x \<in> poss s" if "x \<in> ?O" for x
+    using that assms unfolding overlap_def by blast
+  have "overlap_size (s |_ q) {p. q @ p \<in> P\<^sub>0} {p. q @ p \<in> P\<^sub>1} = (\<Sum>x \<in> ?O. term_size (s |_ (q @ x)))"
+    unfolding overlap_size_def using pos by (intro sum.cong refl) (simp add: subt_at_append)
+  also have "\<dots> = (\<Sum>y \<in> (@) q ` ?O. term_size (s |_ y))"
+    by (simp add: sum.reindex inj_on_def)
+  also have "\<dots> \<le> overlap_size s P\<^sub>0 P\<^sub>1"
+    unfolding overlap_size_def using sub finite_overlap[OF assms] by (intro sum_mono2) auto
+  finally show ?thesis .
+qed
+
+subsection \<open>The Parallel Closure Theorem\<close>
+
 context TRS_inf
 begin
 
-text \<open>The Parallel Moves Lemma 6.4.4 and the case distinction of the proof of
-  Theorem 6.4.8, in one statement: a parallel step from an instance \<open>\<sigma>(u)\<close> of a linear term
-  \<open>u\<close> either takes place entirely inside the substitution (Case 1; then the result is an
-  instance \<open>\<tau>(u)\<close>), or it contracts a redex at a non-variable position \<open>q\<close> of \<open>u\<close>
-  (Case 2, a critical overlap); in that case the remaining redexes form a parallel step from
-  \<open>\<sigma>(u)[\<sigma>\<^sub>0r\<^sub>0]\<^sub>q\<close> to the same result, of strictly smaller weight.\<close>
-
-lemma par_w_lhs_decomp:
-  assumes "linear_term u" and "par_w R (\<sigma> \<cdot> u) n t"
-  shows "(\<exists>\<tau>. t = \<tau> \<cdot> u \<and> (\<forall>x \<in> vars u. (\<sigma> x, \<tau> x) \<in> par_rstep R)) \<or>
-    (\<exists>q l\<^sub>0 r\<^sub>0 \<sigma>\<^sub>0 n'. q \<in> poss u \<and> (\<forall>x. u |_ q \<noteq> Var x) \<and> (l\<^sub>0, r\<^sub>0) \<in> R \<and>
-       (\<sigma> \<cdot> u) |_ q = \<sigma>\<^sub>0 \<cdot> l\<^sub>0 \<and> n' < n \<and> par_w R ((\<sigma> \<cdot> u)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>) n' t)"
-  using assms
-proof (induct u arbitrary: n t)
-  case (Var x)
-  then show ?case using par_w_imp_par_rstep by (intro disjI1 exI[of _ "\<lambda>_. t"]) auto
-next
-  case (Fun g us)
-  from Fun.prems(2) show ?case
-  proof cases
-    case (rule l\<^sub>0 r\<^sub>0 \<sigma>\<^sub>0)
-    have "par_w R ((\<sigma> \<cdot> Fun g us)\<lbrakk>[] \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>) 0 t" using rule par_w_refl by simp
-    moreover have "n = size (\<sigma> \<cdot> Fun g us)" using rule(1,2) by simp
-    then have "0 < n" by simp
-    ultimately show ?thesis using rule
-      by (intro disjI2 exI[of _ "[]"] exI[of _ l\<^sub>0] exI[of _ r\<^sub>0] exI[of _ \<sigma>\<^sub>0] exI[of _ 0]) auto
-  next
-    case (args ss ts ns f')
-    then have ss: "ss = map ((\<cdot>) \<sigma>) us" and t: "t = Fun g ts" and n: "n = sum_list ns"
-      and len: "length ts = length us" "length ns = length us" by auto
-    have steps: "par_w R (\<sigma> \<cdot> us ! i) (ns ! i) (ts ! i)" if "i < length us" for i
-      using args(6)[of i] that len ss by auto
-    have lin: "linear_term (us ! i)" if "i < length us" for i
-      using Fun.prems(1) that by auto
-    note IH = Fun.hyps[OF nth_mem lin steps]
-    show ?thesis
-    proof (cases "\<exists>i < length us. \<exists>q l\<^sub>0 r\<^sub>0 \<sigma>\<^sub>0 n'. q \<in> poss (us ! i) \<and> (\<forall>x. us ! i |_ q \<noteq> Var x) \<and>
-        (l\<^sub>0, r\<^sub>0) \<in> R \<and> (\<sigma> \<cdot> us ! i) |_ q = \<sigma>\<^sub>0 \<cdot> l\<^sub>0 \<and> n' < ns ! i \<and>
-        par_w R ((\<sigma> \<cdot> us ! i)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>) n' (ts ! i)")
-      case True
-      then obtain i q l\<^sub>0 r\<^sub>0 \<sigma>\<^sub>0 n' where i: "i < length us" and q: "q \<in> poss (us ! i)"
-        "\<forall>x. us ! i |_ q \<noteq> Var x" and R0: "(l\<^sub>0, r\<^sub>0) \<in> R" and red: "(\<sigma> \<cdot> us ! i) |_ q = \<sigma>\<^sub>0 \<cdot> l\<^sub>0"
-        and n': "n' < ns ! i" and st: "par_w R ((\<sigma> \<cdot> us ! i)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>) n' (ts ! i)"
-        by blast
-      let ?ss = "(map ((\<cdot>) \<sigma>) us)[i := (\<sigma> \<cdot> us ! i)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>]"
-      have "par_w R (Fun g ?ss) (sum_list (ns[i := n'])) (Fun g ts)"
-        by (rule par_w.args) (use len steps st i in \<open>auto simp: nth_list_update\<close>)
-      moreover have "sum_list (ns[i := n']) < n"
-        using n i len n' elem_le_sum_list[of i ns] by (simp add: sum_list_update)
-      moreover have "(\<sigma> \<cdot> Fun g us)\<lbrakk>i # q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk> = Fun g ?ss" using i by simp
-      ultimately show ?thesis using i q R0 red t
-        by (intro disjI2 exI[of _ "i # q"] exI[of _ l\<^sub>0] exI[of _ r\<^sub>0] exI[of _ \<sigma>\<^sub>0]
-            exI[of _ "sum_list (ns[i := n'])"]) auto
-    next
-      case False
-      then have "\<exists>\<tau>. ts ! i = \<tau> \<cdot> us ! i \<and> (\<forall>x \<in> vars (us ! i). (\<sigma> x, \<tau> x) \<in> par_rstep R)"
-        if "i < length us" for i
-        using IH[OF that] that by blast
-      then obtain \<tau>s where \<tau>s: "\<And>i. i < length us \<Longrightarrow>
-          ts ! i = \<tau>s i \<cdot> us ! i \<and> (\<forall>x \<in> vars (us ! i). (\<sigma> x, \<tau>s i x) \<in> par_rstep R)"
-        by metis
-      obtain \<tau> where \<tau>: "\<And>i x. i < length us \<Longrightarrow> x \<in> vars (us ! i) \<Longrightarrow> \<tau> x = \<tau>s i x"
-        using merge_substs[of "length us" "\<lambda>i. vars (us ! i)" \<tau>s] Fun.prems(1) by auto
-      have "ts ! i = \<tau> \<cdot> us ! i" if "i < length us" for i
-        using \<tau>s[OF that] \<tau>[OF that] by (auto intro: subst_apply_cong)
-      then have "t = \<tau> \<cdot> Fun g us" using t len by (auto intro: nth_equalityI)
-      moreover have "\<forall>x \<in> vars (Fun g us). (\<sigma> x, \<tau> x) \<in> par_rstep R"
-        using \<tau>s \<tau> by (auto simp: in_set_conv_nth)
-      ultimately show ?thesis by blast
-    qed
-  qed simp
-qed
-
-text \<open>The core of the proof of Theorem 6.4.8: a fork between a root step and an arbitrary
-  parallel step, assuming the theorem for all forks of smaller measure.\<close>
+text \<open>The core of the proof of Theorem 6.4.8: a peak in which one of the steps contracts the
+  redex \<open>\<sigma>(l)\<close> at the root, assuming the theorem for all peaks with a smaller overlap.
+  If no redex of the other step lies at a non-variable position of \<open>l\<close>, Lemma 6.4.4 applies as in
+  the orthogonal case. Otherwise such a redex at \<open>q\<close> forms a critical pair with the root redex;
+  contracting it first and using parallel closedness, we obtain a peak
+  \<open>t\<^sub>1 \<leftleftarrows>\<^sup>P\<^sup>1\<^sup>-\<^sup>{\<^sup>q\<^sup>} s' \<rightrightarrows> t\<^sub>0\<close> with a smaller overlap.\<close>
 
 lemma parallel_closed_root_peak:
   assumes ll: "left_linear R" and pc: "parallel_closed R"
-    and IH: "\<forall>s' a t\<^sub>a b t\<^sub>b. min a b < n \<longrightarrow> par_w R s' a t\<^sub>a \<longrightarrow> par_w R s' b t\<^sub>b \<longrightarrow>
-      (\<exists>u. (t\<^sub>a, u) \<in> par_rstep R \<and> (t\<^sub>b, u) \<in> par_rstep R)"
-    and R: "(l, r) \<in> R" and st: "par_w R (\<sigma> \<cdot> l) n t"
-  shows "\<exists>u. (\<sigma> \<cdot> r, u) \<in> par_rstep R \<and> (t, u) \<in> par_rstep R"
+    and step0: "par_rstep_at R P\<^sub>0 s t\<^sub>0" and step1: "par_rstep_at R P\<^sub>1 s t\<^sub>1" and root: "[] \<in> P\<^sub>0"
+    and IH: "\<And>s' P\<^sub>0' P\<^sub>1' t\<^sub>0' t\<^sub>1'. overlap_size s' P\<^sub>0' P\<^sub>1' < overlap_size s P\<^sub>0 P\<^sub>1 \<Longrightarrow>
+      par_rstep_at R P\<^sub>0' s' t\<^sub>0' \<Longrightarrow> par_rstep_at R P\<^sub>1' s' t\<^sub>1' \<Longrightarrow>
+      \<exists>u. (t\<^sub>0', u) \<in> par_rstep R \<and> (t\<^sub>1', u) \<in> par_rstep R"
+  shows "\<exists>u. (t\<^sub>0, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R"
 proof -
-  have lin: "linear_term l" using ll R by (auto simp: left_linear_def)
-  from par_w_lhs_decomp[OF lin st] show ?thesis
-  proof
-    assume "\<exists>\<tau>. t = \<tau> \<cdot> l \<and> (\<forall>x \<in> vars l. (\<sigma> x, \<tau> x) \<in> par_rstep R)"
-    then obtain \<tau> where t: "t = \<tau> \<cdot> l" and \<sigma>\<tau>: "\<forall>x \<in> vars l. (\<sigma> x, \<tau> x) \<in> par_rstep R" by blast
-    \<comment> \<open>Case 1 (Parallel Moves Lemma): \<open>\<sigma>r \<rightrightarrows> \<tau>r \<leftarrow> \<tau>l = t\<close>.\<close>
-    have "(\<sigma> \<cdot> r, \<tau> \<cdot> r) \<in> par_rstep R"
-      using rule_vars[OF R] \<sigma>\<tau> by (intro par_rstep_subst) auto
-    moreover have "(t, \<tau> \<cdot> r) \<in> par_rstep R" unfolding t using R by (rule par_rstep.rule)
+  from step0 obtain c where P0: "parallel_set P\<^sub>0"
+    and redex0: "\<And>p. p \<in> P\<^sub>0 \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
+    and t0: "t\<^sub>0 = s\<lbrakk>P\<^sub>0 \<Leftarrow> c\<rbrakk>"
+    unfolding par_rstep_at_def by blast
+  from step1 obtain c' where P1: "parallel_set P\<^sub>1" "P\<^sub>1 \<subseteq> poss s"
+    and redex1: "\<And>p. p \<in> P\<^sub>1 \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c' p = \<sigma> \<cdot> r"
+    and t1: "t\<^sub>1 = s\<lbrakk>P\<^sub>1 \<Leftarrow> c'\<rbrakk>"
+    unfolding par_rstep_at_def by blast
+  have P0': "P\<^sub>0 = {[]}" using parallel_set_Nil[OF P0 root] .
+  obtain l r \<sigma> where R: "(l, r) \<in> R" and seq: "s = \<sigma> \<cdot> l" and c: "c [] = \<sigma> \<cdot> r"
+    using redex0[OF root] by auto
+  have t0': "t\<^sub>0 = \<sigma> \<cdot> r" using t0 c P0' by (simp add: replace_at_set_singleton)
+  have lin: "linear_term l" using ll R unfolding left_linear_def by auto
+  show ?thesis
+  proof (cases "\<forall>p \<in> P\<^sub>1. p \<in> poss l \<longrightarrow> (\<exists>x. l |_ p = Var x)")
+    case True
+    text \<open>Case 1: the redexes of the second step lie inside the substitution.\<close>
+    then obtain \<tau> where t1': "t\<^sub>1 = \<tau> \<cdot> l" and \<sigma>\<tau>: "\<forall>x \<in> vars l. (\<sigma> x, \<tau> x) \<in> par_rstep R"
+      using par_rstep_at_linear[OF lin step1[unfolded seq]] by blast
+    have "(t\<^sub>0, \<tau> \<cdot> r) \<in> par_rstep R"
+      unfolding t0' using rule_vars[OF R] \<sigma>\<tau> by (intro par_rstep_subst) auto
+    moreover have "(t\<^sub>1, \<tau> \<cdot> r) \<in> par_rstep R" unfolding t1' using R by (rule par_rstep_rule)
     ultimately show ?thesis by blast
   next
-    assume "\<exists>q l\<^sub>0 r\<^sub>0 \<sigma>\<^sub>0 n'. q \<in> poss l \<and> (\<forall>x. l |_ q \<noteq> Var x) \<and> (l\<^sub>0, r\<^sub>0) \<in> R \<and>
-       (\<sigma> \<cdot> l) |_ q = \<sigma>\<^sub>0 \<cdot> l\<^sub>0 \<and> n' < n \<and> par_w R ((\<sigma> \<cdot> l)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>) n' t"
-    then obtain q l\<^sub>0 r\<^sub>0 \<sigma>\<^sub>0 n' where q: "q \<in> poss l" "\<forall>x. l |_ q \<noteq> Var x"
-      and R0: "(l\<^sub>0, r\<^sub>0) \<in> R" and red: "(\<sigma> \<cdot> l) |_ q = \<sigma>\<^sub>0 \<cdot> l\<^sub>0" and n': "n' < n"
-      and st': "par_w R ((\<sigma> \<cdot> l)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>) n' t" by blast
-    have unif: "\<sigma> \<cdot> (l |_ q) = \<sigma>\<^sub>0 \<cdot> l\<^sub>0" using red subt_at_subst_apply[OF q(1)] by simp
+    case False
+    text \<open>Case 2: a redex of the second step at a non-variable position \<open>q\<close> of \<open>l\<close>.\<close>
+    then obtain q where q: "q \<in> P\<^sub>1" "q \<in> poss l" and nv: "\<forall>x. l |_ q \<noteq> Var x" by blast
+    obtain l' r' \<sigma>' where R': "(l', r') \<in> R" and sq: "s |_ q = \<sigma>' \<cdot> l'" and c'q: "c' q = \<sigma>' \<cdot> r'"
+      using redex1[OF q(1)] by blast
+    have unif: "\<sigma> \<cdot> (l |_ q) = \<sigma>' \<cdot> l'" using sq seq q(2) by (simp add: subt_at_subst_apply)
     show ?thesis
-    proof (cases "q = [] \<and> (l, r) = (l\<^sub>0, r\<^sub>0)")
+    proof (cases "q = [] \<and> (l, r) = (l', r')")
       case True
-      then have l: "\<sigma> \<cdot> l = \<sigma>\<^sub>0 \<cdot> l" using unif by simp
-      have "\<sigma> \<cdot> r = \<sigma>\<^sub>0 \<cdot> r"
+      text \<open>A trivial overlap: both steps contract the same redex.\<close>
+      then have l: "\<sigma> \<cdot> l = \<sigma>' \<cdot> l" using unif by simp
+      have "\<sigma> \<cdot> r = \<sigma>' \<cdot> r"
         by (intro subst_apply_cong subst_apply_eq_vars[OF l]) (use rule_vars[OF R] in auto)
-      then have "(\<sigma> \<cdot> r, t) \<in> par_rstep R" using st' True par_w_imp_par_rstep by auto
-      then show ?thesis by (intro exI[of _ t]) simp
+      moreover have "t\<^sub>1 = \<sigma>' \<cdot> r'"
+        using t1 c'q parallel_set_Nil[OF P1(1)] q(1) True by (simp add: replace_at_set_singleton)
+      ultimately have "t\<^sub>1 = t\<^sub>0" using t0' True by simp
+      then show ?thesis by (intro exI[of _ t\<^sub>0]) simp
     next
       case False
-      \<comment> \<open>Case 2: a critical overlap. Parallel closedness closes the critical pair, and the
-        remaining redexes give a fork of smaller measure.\<close>
-      from overlap_imp_CP[OF infinite_vars R R0 q unif False]
-      obtain u\<^sub>1 u\<^sub>2 \<delta> where cp: "(u\<^sub>1, u\<^sub>2) \<in> CP R" and "\<delta> \<cdot> u\<^sub>1 = \<sigma> \<cdot> r"
-        and "\<delta> \<cdot> u\<^sub>2 = (\<sigma> \<cdot> l)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>" by blast
-      moreover have "(u\<^sub>2, u\<^sub>1) \<in> par_rstep R" using pc cp unfolding parallel_closed_def by auto
-      ultimately have "((\<sigma> \<cdot> l)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>, \<sigma> \<cdot> r) \<in> par_rstep R"
-        using par_rstep_subst_closed[of u\<^sub>2 u\<^sub>1 R \<delta>] by simp
-      then obtain k where "par_w R ((\<sigma> \<cdot> l)\<lbrakk>q \<leftarrow> \<sigma>\<^sub>0 \<cdot> r\<^sub>0\<rbrakk>) k (\<sigma> \<cdot> r)"
-        using par_rstep_imp_par_w by blast
-      from IH[rule_format, OF _ st' this] n' show ?thesis by fastforce
-    qed
-  qed
-qed
-
-lemma parallel_closed_fork:
-  assumes ll: "left_linear R" and pc: "parallel_closed R"
-  shows "par_w R s n\<^sub>0 t\<^sub>0 \<Longrightarrow> par_w R s n\<^sub>1 t\<^sub>1 \<Longrightarrow> min n\<^sub>0 n\<^sub>1 \<le> k \<Longrightarrow>
-    \<exists>u. (t\<^sub>0, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R"
-proof (induct k arbitrary: s n\<^sub>0 t\<^sub>0 n\<^sub>1 t\<^sub>1 rule: less_induct)
-  case (less k)
-  have IHk: "\<exists>u. (t\<^sub>a, u) \<in> par_rstep R \<and> (t\<^sub>b, u) \<in> par_rstep R"
-    if "min a b < k" "par_w R s' a t\<^sub>a" "par_w R s' b t\<^sub>b" for s' a t\<^sub>a b t\<^sub>b
-    using less.hyps[OF that(1) that(2,3)] by blast
-  from less.prems show ?case
-  proof (induct arbitrary: n\<^sub>1 t\<^sub>1 rule: par_w.induct)
-    case (var x)
-    from var(1) show ?case
-    proof cases
-      case var
-      then show ?thesis by (intro exI[of _ "Var x"]) auto
-    next
-      case (rule l r \<sigma>)
-      then show ?thesis using rule_lhs_not_Var by (cases l) auto
-    qed
-  next
-    case (args ss ts ns f)
-    note len = args(1,2) and IHs = args(4) and min_le = args(6)
-    have st0: "par_w R (Fun f ss) (sum_list ns) (Fun f ts)"
-      using args(1,2,3) by (rule par_w.args)
-    from args(5) show ?case
-    proof cases
-      case (args ts' ns')
-      have "\<exists>u. (ts ! i, u) \<in> par_rstep R \<and> (ts' ! i, u) \<in> par_rstep R" if i: "i < length ts" for i
+      text \<open>A critical overlap.\<close>
+      let ?s' = "s\<lbrakk>q \<leftarrow> c' q\<rbrakk>"
+      obtain u\<^sub>1 u\<^sub>2 \<delta> where cp: "(u\<^sub>1, u\<^sub>2) \<in> CP R" and u1: "\<delta> \<cdot> u\<^sub>1 = \<sigma> \<cdot> r"
+        and u2: "\<delta> \<cdot> u\<^sub>2 = (\<sigma> \<cdot> l)\<lbrakk>q \<leftarrow> \<sigma>' \<cdot> r'\<rbrakk>"
+        using overlap_imp_CP[OF infinite_vars R R' q(2) nv unif] False by blast
+      have "(u\<^sub>2, u\<^sub>1) \<in> par_rstep R" using pc cp unfolding parallel_closed_def by blast
+      then have "(?s', t\<^sub>0) \<in> par_rstep R"
+        using par_rstep_subst_closed[of u\<^sub>2 u\<^sub>1 R \<delta>] u1 u2 t0' seq c'q by simp
+      then obtain P' where step': "par_rstep_at R P' ?s' t\<^sub>0" by (rule par_rstepE)
+      let ?P1 = "P\<^sub>1 - {q}"
+      have qs: "q \<in> poss s" using P1(2) q(1) by blast
+      have par: "q \<parallel> p" if "p \<in> ?P1" for p using parallel_setD[OF P1(1) q(1)] that by blast
+      have P1': "parallel_set ?P1" "?P1 \<subseteq> poss ?s'"
+        using parallel_set_subset[OF P1(1)] P1(2) par qs by (auto intro: parallel_poss_replace_at)
+      have sub: "?s' |_ p = s |_ p" if "p \<in> ?P1" for p
+        using par[OF that] qs P1(2) that by (intro parallel_subt_at_replace_at) auto
+      have "t\<^sub>1 = ?s'\<lbrakk>?P1 \<Leftarrow> c'\<rbrakk>"
       proof -
-        have "ns ! i \<le> sum_list ns" "ns' ! i \<le> sum_list ns'"
-          using i len args by (auto intro!: elem_le_sum_list)
-        then have "min (ns ! i) (ns' ! i) \<le> k" using min_le args by auto
-        then show ?thesis using IHs[OF i, of "ns' ! i" "ts' ! i"] args i len by auto
+        have "?s'\<lbrakk>?P1 \<Leftarrow> c'\<rbrakk> = replace_par ?s' ?P1 c'"
+          using P1' by (rule replace_at_set_replace_par)
+        also have "\<dots> = replace_par s (insert q ?P1) c'"
+          using qs par by (intro replace_par_insert) auto
+        also have "insert q ?P1 = P\<^sub>1" using q(1) by blast
+        finally show ?thesis using t1 P1 by (simp add: replace_at_set_replace_par)
       qed
-      then obtain us where us: "\<And>i. i < length ts \<Longrightarrow>
-          (ts ! i, us i) \<in> par_rstep R \<and> (ts' ! i, us i) \<in> par_rstep R" by metis
-      have "(Fun f ts, Fun f (map us [0..<length ts])) \<in> par_rstep R"
-        using us by (auto intro!: par_rstep.args)
-      moreover have "(Fun f ts', Fun f (map us [0..<length ts])) \<in> par_rstep R"
-        using us args len by (auto intro!: par_rstep.args)
-      ultimately show ?thesis using args by blast
-    next
-      case (rule l r \<sigma>)
-      have st0': "par_w R (\<sigma> \<cdot> l) (sum_list ns) (Fun f ts)" using st0 rule(1) by simp
-      have "sum_list ns \<le> size (\<sigma> \<cdot> l)" using par_w_size[OF st0'] .
-      then have le: "sum_list ns \<le> k" using min_le rule by simp
-      have IH': "\<forall>s' a t\<^sub>a b t\<^sub>b. min a b < sum_list ns \<longrightarrow> par_w R s' a t\<^sub>a \<longrightarrow>
-          par_w R s' b t\<^sub>b \<longrightarrow> (\<exists>u. (t\<^sub>a, u) \<in> par_rstep R \<and> (t\<^sub>b, u) \<in> par_rstep R)"
-      proof (intro allI impI)
-        fix s' a t\<^sub>a b t\<^sub>b assume "min a b < sum_list ns" "par_w R s' a t\<^sub>a" "par_w R s' b t\<^sub>b"
-        then show "\<exists>u. (t\<^sub>a, u) \<in> par_rstep R \<and> (t\<^sub>b, u) \<in> par_rstep R"
-          using IHk[OF _ \<open>par_w R s' a t\<^sub>a\<close> \<open>par_w R s' b t\<^sub>b\<close>] le by simp
+      moreover have "par_rstep_at R ?P1 ?s' (?s'\<lbrakk>?P1 \<Leftarrow> c'\<rbrakk>)"
+        using P1' sub redex1 by (intro par_rstep_atI) auto
+      ultimately have step1': "par_rstep_at R ?P1 ?s' t\<^sub>1" by simp
+      have "overlap_size ?s' ?P1 P' \<le> (\<Sum>p \<in> ?P1. term_size (?s' |_ p))"
+        using step' P1' unfolding par_rstep_at_def by (intro overlap_size_le) auto
+      also have "\<dots> = (\<Sum>p \<in> ?P1. term_size (s |_ p))" using sub by simp
+      also have "\<dots> < (\<Sum>p \<in> P\<^sub>1. term_size (s |_ p))"
+      proof -
+        have "finite P\<^sub>1" using P1(2) by (rule finite_subset) simp
+        then have "(\<Sum>p \<in> P\<^sub>1. term_size (s |_ p)) = term_size (s |_ q) + (\<Sum>p \<in> ?P1. term_size (s |_ p))"
+          using q(1) by (simp add: sum.remove)
+        then show ?thesis using term_size_pos[of "s |_ q"] by simp
       qed
-      have "\<exists>u. (\<sigma> \<cdot> r, u) \<in> par_rstep R \<and> (Fun f ts, u) \<in> par_rstep R"
-        by (rule parallel_closed_root_peak[OF ll pc IH' rule(4) st0'])
-      then show ?thesis using rule(3) by blast
+      also have "\<dots> \<le> overlap_size s P\<^sub>0 P\<^sub>1" using P1(2) P0' by (simp add: overlap_size_root)
+      finally have "overlap_size ?s' ?P1 P' < overlap_size s P\<^sub>0 P\<^sub>1" .
+      from IH[OF this step1' step'] show ?thesis by blast
     qed
-  next
-    case (rule l r \<sigma>)
-    have "n\<^sub>1 \<le> size (\<sigma> \<cdot> l)" using par_w_size[OF rule(2)] .
-    then have le: "n\<^sub>1 \<le> k" using rule(3) by simp
-    have IH': "\<forall>s' a t\<^sub>a b t\<^sub>b. min a b < n\<^sub>1 \<longrightarrow> par_w R s' a t\<^sub>a \<longrightarrow>
-        par_w R s' b t\<^sub>b \<longrightarrow> (\<exists>u. (t\<^sub>a, u) \<in> par_rstep R \<and> (t\<^sub>b, u) \<in> par_rstep R)"
-    proof (intro allI impI)
-      fix s' a t\<^sub>a b t\<^sub>b assume "min a b < n\<^sub>1" "par_w R s' a t\<^sub>a" "par_w R s' b t\<^sub>b"
-      then show "\<exists>u. (t\<^sub>a, u) \<in> par_rstep R \<and> (t\<^sub>b, u) \<in> par_rstep R"
-        using IHk[OF _ \<open>par_w R s' a t\<^sub>a\<close> \<open>par_w R s' b t\<^sub>b\<close>] le by simp
-    qed
-    have "\<exists>u. (\<sigma> \<cdot> r, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R"
-      by (rule parallel_closed_root_peak[OF ll pc IH' rule(1) rule(2)])
-    then show ?case by blast
   qed
 qed
 
-text \<open>Theorem 6.4.8 (Parallel Closure Theorem).\<close>
+text \<open>Theorem 6.4.8 (Parallel Closure Theorem). We show that every peak
+  \<open>t\<^sub>0 \<leftleftarrows>\<^sup>P\<^sup>0 s \<rightrightarrows>\<^sup>P\<^sup>1 t\<^sub>1\<close> is joinable by strong induction on the size of the overlap, joining the
+  peaks below the outermost positions of \<open>P\<^sub>0 \<union> P\<^sub>1\<close>.\<close>
+
+lemma parallel_closed_peak:
+  assumes ll: "left_linear R" and pc: "parallel_closed R"
+  shows "par_rstep_at R P\<^sub>0 s t\<^sub>0 \<Longrightarrow> par_rstep_at R P\<^sub>1 s t\<^sub>1 \<Longrightarrow>
+    \<exists>u. (t\<^sub>0, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R"
+proof (induct "overlap_size s P\<^sub>0 P\<^sub>1" arbitrary: s P\<^sub>0 P\<^sub>1 t\<^sub>0 t\<^sub>1 rule: less_induct)
+  case less
+  have poss: "P\<^sub>0 \<subseteq> poss s" "P\<^sub>1 \<subseteq> poss s" using less.prems unfolding par_rstep_at_def by blast+
+  show ?case
+  proof (rule par_peak_outermost[OF less.prems])
+    fix q assume q: "q \<in> outermost (P\<^sub>0 \<union> P\<^sub>1)"
+    let ?P0 = "{p. q @ p \<in> P\<^sub>0}" and ?P1 = "{p. q @ p \<in> P\<^sub>1}"
+    note local = par_rstep_at_outermost[OF less.prems q]
+    have le: "overlap_size (s |_ q) ?P0 ?P1 \<le> overlap_size s P\<^sub>0 P\<^sub>1"
+      using poss by (rule overlap_size_outermost)
+    have IH: "\<exists>u. (t\<^sub>0', u) \<in> par_rstep R \<and> (t\<^sub>1', u) \<in> par_rstep R"
+      if "overlap_size s' P\<^sub>0' P\<^sub>1' < overlap_size (s |_ q) ?P0 ?P1"
+        and "par_rstep_at R P\<^sub>0' s' t\<^sub>0'" and "par_rstep_at R P\<^sub>1' s' t\<^sub>1'"
+      for s' P\<^sub>0' P\<^sub>1' t\<^sub>0' t\<^sub>1'
+      using less.hyps[OF order_less_le_trans[OF that(1) le] that(2,3)] .
+    have IH': "\<exists>u. (t\<^sub>0', u) \<in> par_rstep R \<and> (t\<^sub>1', u) \<in> par_rstep R"
+      if "overlap_size s' P\<^sub>0' P\<^sub>1' < overlap_size (s |_ q) ?P1 ?P0"
+        and "par_rstep_at R P\<^sub>0' s' t\<^sub>0'" and "par_rstep_at R P\<^sub>1' s' t\<^sub>1'"
+      for s' P\<^sub>0' P\<^sub>1' t\<^sub>0' t\<^sub>1'
+      using IH[OF _ that(2,3)] that(1) by (simp add: overlap_size_sym[of "s |_ q" ?P1 ?P0])
+    have "q \<in> P\<^sub>0 \<or> q \<in> P\<^sub>1" using q outermost_subset by blast
+    then show "\<exists>u. (t\<^sub>0 |_ q, u) \<in> par_rstep R \<and> (t\<^sub>1 |_ q, u) \<in> par_rstep R"
+    proof
+      assume "q \<in> P\<^sub>0"
+      then have "[] \<in> ?P0" by simp
+      from parallel_closed_root_peak[OF ll pc local this IH] show ?thesis .
+    next
+      assume "q \<in> P\<^sub>1"
+      then have "[] \<in> ?P1" by simp
+      from parallel_closed_root_peak[OF ll pc local(2) local(1) this IH']
+      have "\<exists>u. (t\<^sub>1 |_ q, u) \<in> par_rstep R \<and> (t\<^sub>0 |_ q, u) \<in> par_rstep R" .
+      then show ?thesis by blast
+    qed
+  qed
+qed
 
 theorem parallel_closure_theorem:
   assumes "left_linear R" and "parallel_closed R"
@@ -313,9 +341,9 @@ theorem parallel_closure_theorem:
   unfolding diamond_def
 proof (intro allI impI, elim conjE)
   fix s t\<^sub>0 t\<^sub>1 assume "(s, t\<^sub>0) \<in> par_rstep R" and "(s, t\<^sub>1) \<in> par_rstep R"
-  then obtain n\<^sub>0 n\<^sub>1 where "par_w R s n\<^sub>0 t\<^sub>0" and "par_w R s n\<^sub>1 t\<^sub>1"
-    using par_rstep_imp_par_w by metis
-  from parallel_closed_fork[OF assms this order.refl]
+  then obtain P\<^sub>0 P\<^sub>1 where "par_rstep_at R P\<^sub>0 s t\<^sub>0" and "par_rstep_at R P\<^sub>1 s t\<^sub>1"
+    by (auto elim!: par_rstepE)
+  from parallel_closed_peak[OF assms this]
   show "\<exists>u. (t\<^sub>0, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R" .
 qed
 

@@ -1043,90 +1043,876 @@ text \<open>Definition 6.3.6.\<close>
 definition orthogonal :: "('f, 'v) term rel \<Rightarrow> bool" where
   "orthogonal R \<longleftrightarrow> left_linear R \<and> CP R = {}"
 
-text \<open>Definition 6.3.7. The book defines \<open>s \<rightrightarrows> t\<close> as the simultaneous contraction of redexes
-  at a set of parallel positions of \<open>s\<close>. We use the equivalent inductive characterisation:
-  a parallel step either contracts a redex at the root, or performs parallel steps in all
-  arguments of a function symbol (possibly the empty step, which makes \<open>\<rightrightarrows>\<close> reflexive).\<close>
+subsection \<open>Parallel reduction\<close>
 
-inductive_set par_rstep :: "('f, 'v) term rel \<Rightarrow> ('f, 'v) term rel" for R where
-  var: "(Var x, Var x) \<in> par_rstep R"
-| args: "length ss = length ts \<Longrightarrow> (\<And>i. i < length ts \<Longrightarrow> (ss ! i, ts ! i) \<in> par_rstep R) \<Longrightarrow>
-    (Fun f ss, Fun f ts) \<in> par_rstep R"
-| rule: "(l, r) \<in> R \<Longrightarrow> (\<sigma> \<cdot> l, \<sigma> \<cdot> r) \<in> par_rstep R"
+text \<open>Definition 6.3.7. A set of positions \<open>P\<close> is parallel if any two distinct positions of \<open>P\<close>
+  are parallel.\<close>
 
-lemma par_rstep_refl [simp]: "(t, t) \<in> par_rstep R"
-  by (induct t) (auto intro: par_rstep.intros)
+definition parallel_set :: "pos set \<Rightarrow> bool" where
+  "parallel_set P \<longleftrightarrow> (\<forall>p \<in> P. \<forall>q \<in> P. p \<parallel> q \<or> p = q)"
 
-lemma par_rstep_ctxt:
-  assumes "(u, v) \<in> par_rstep R" and "p \<in> poss s"
-  shows "(s\<lbrakk>p \<leftarrow> u\<rbrakk>, s\<lbrakk>p \<leftarrow> v\<rbrakk>) \<in> par_rstep R"
-  using assms(2)
-proof (induct p arbitrary: s)
+text \<open>For \<open>P = {p\<^sub>1, \<dots>, p\<^sub>n}\<close> parallel and a term \<open>t\<^sub>p\<close> for each \<open>p \<in> P\<close>, the book writes
+  \<open>s[t\<^sub>p]\<^sub>p\<^sub>\<in>\<^sub>P := s[t\<^sub>p\<^sub>1]\<^sub>p\<^sub>1 \<dots> [t\<^sub>p\<^sub>n]\<^sub>p\<^sub>n\<close>. We first define the successive replacement along a list
+  of positions, and then take any enumeration of \<open>P\<close> without repetitions. Since the positions
+  are parallel, the order of the replacements does not matter (\<open>replace_at_set_any_order\<close> below).\<close>
+
+fun replace_at_list :: "('f, 'v) term \<Rightarrow> (pos \<times> ('f, 'v) term) list \<Rightarrow> ('f, 'v) term" where
+  "replace_at_list s [] = s"
+| "replace_at_list s ((p, t) # pts) = replace_at_list (s\<lbrakk>p \<leftarrow> t\<rbrakk>) pts"
+
+definition replace_at_set :: "('f, 'v) term \<Rightarrow> pos set \<Rightarrow> (pos \<Rightarrow> ('f, 'v) term) \<Rightarrow> ('f, 'v) term"
+  (\<open>_\<lbrakk>_ \<Leftarrow> _\<rbrakk>\<close> [1000, 0, 0] 1000) where
+  "s\<lbrakk>P \<Leftarrow> t\<rbrakk> = replace_at_list s (map (\<lambda>p. (p, t p)) (SOME ps. distinct ps \<and> set ps = P))"
+
+text \<open>The parallel reduction step \<open>s \<rightrightarrows>\<^sub>R\<^sup>P s[\<sigma>\<^sub>p(r\<^sub>p)]\<^sub>p\<^sub>\<in>\<^sub>P\<close>, where \<open>P\<close> is a parallel set of positions
+  of \<open>s\<close> and, for each \<open>p \<in> P\<close>, \<open>s|\<^sub>p = \<sigma>\<^sub>p(l\<^sub>p)\<close> for a rule \<open>l\<^sub>p \<rightarrow> r\<^sub>p \<in> R\<close>. The function \<open>c\<close> gives
+  the contractum \<open>c(p) = \<sigma>\<^sub>p(r\<^sub>p)\<close> at each \<open>p \<in> P\<close>. The relation \<open>\<rightrightarrows>\<^sub>R\<close> omits the annotation \<open>P\<close>.\<close>
+
+definition par_rstep_at :: "('f, 'v) term rel \<Rightarrow> pos set \<Rightarrow> ('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool"
+  where
+  "par_rstep_at R P s t \<longleftrightarrow> parallel_set P \<and> P \<subseteq> poss s \<and>
+    (\<exists>c. (\<forall>p \<in> P. \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r) \<and> t = s\<lbrakk>P \<Leftarrow> c\<rbrakk>)"
+
+definition par_rstep :: "('f, 'v) term rel \<Rightarrow> ('f, 'v) term rel" where
+  "par_rstep R = {(s, t). \<exists>P. par_rstep_at R P s t}"
+
+subsubsection \<open>Parallel sets of positions\<close>
+
+lemma parallel_setD: "parallel_set P \<Longrightarrow> p \<in> P \<Longrightarrow> q \<in> P \<Longrightarrow> p \<noteq> q \<Longrightarrow> p \<parallel> q"
+  unfolding parallel_set_def by blast
+
+lemma parallel_set_subset: "parallel_set P \<Longrightarrow> Q \<subseteq> P \<Longrightarrow> parallel_set Q"
+  unfolding parallel_set_def by blast
+
+lemma parallel_set_empty [simp]: "parallel_set {}"
+  and parallel_set_singleton [simp]: "parallel_set {p}"
+  unfolding parallel_set_def by auto
+
+lemma parallel_append_left [simp]: "q @ p \<parallel> q @ p' \<longleftrightarrow> p \<parallel> p'"
+  by (induct q) auto
+
+lemma parallel_append_parallel: "q \<parallel> q' \<Longrightarrow> q @ p \<parallel> q' @ p'"
+  unfolding parallel_def prefix_le_def by (metis append_eq_append_conv2)
+
+lemma parallel_set_Nil: "parallel_set P \<Longrightarrow> [] \<in> P \<Longrightarrow> P = {[]}"
+  using not_parallel_Nil unfolding parallel_set_def by blast
+
+lemma parallel_set_below:
+  assumes "parallel_set P"
+  shows "parallel_set {p. q @ p \<in> P}"
+  unfolding parallel_set_def
+proof (intro ballI)
+  fix p p' assume "p \<in> {p. q @ p \<in> P}" and "p' \<in> {p. q @ p \<in> P}"
+  then have "q @ p \<parallel> q @ p' \<or> q @ p = q @ p'" using assms unfolding parallel_set_def by blast
+  then show "p \<parallel> p' \<or> p = p'" by simp
+qed
+
+lemma parallel_not_less: "parallel_set P \<Longrightarrow> p \<in> P \<Longrightarrow> q \<in> P \<Longrightarrow> \<not> p <\<^sub>p q"
+  unfolding parallel_set_def parallel_def prefix_less_def by blast
+
+lemma Cons_prefix_less_Cons [simp]: "i # p <\<^sub>p j # q \<longleftrightarrow> i = j \<and> p <\<^sub>p q"
+  and prefix_le_Nil [simp]: "p \<le>\<^sub>p [] \<longleftrightarrow> p = []"
+  unfolding prefix_less_def prefix_le_def by auto
+
+text \<open>Two prefixes of the same position are comparable.\<close>
+
+lemma prefix_le_cases: "p \<le>\<^sub>p r \<Longrightarrow> q \<le>\<^sub>p r \<Longrightarrow> p \<le>\<^sub>p q \<or> q \<le>\<^sub>p p"
+  unfolding prefix_le_def by (metis append_eq_append_conv2)
+
+text \<open>The outermost positions of a set.\<close>
+
+definition outermost :: "pos set \<Rightarrow> pos set" where
+  "outermost P = {p \<in> P. \<forall>q \<in> P. \<not> q <\<^sub>p p}"
+
+lemma outermost_subset: "outermost P \<subseteq> P"
+  unfolding outermost_def by blast
+
+lemma parallel_set_outermost: "parallel_set (outermost P)"
+  unfolding parallel_set_def outermost_def parallel_def prefix_less_def by blast
+
+lemma outermost_exists: "p \<in> P \<Longrightarrow> \<exists>q \<in> outermost P. q \<le>\<^sub>p p"
+proof (induct "length p" arbitrary: p rule: less_induct)
+  case less
+  show ?case
+  proof (cases "p \<in> outermost P")
+    case False
+    then obtain q where q: "q \<in> P" "q <\<^sub>p p" using less.prems unfolding outermost_def by blast
+    then have "length q < length p"
+      unfolding prefix_less_def prefix_le_def by auto
+    then obtain q' where "q' \<in> outermost P" "q' \<le>\<^sub>p q" using less.hyps q(1) by blast
+    then show ?thesis using q(2) prefix_le_trans unfolding prefix_less_def by blast
+  qed (use prefix_le_refl in blast)
+qed
+
+subsubsection \<open>Simultaneous replacement\<close>
+
+text \<open>To reason about \<open>s[t\<^sub>p]\<^sub>p\<^sub>\<in>\<^sub>P\<close> we describe it recursively on \<open>s\<close>.\<close>
+
+function replace_par :: "('f, 'v) term \<Rightarrow> pos set \<Rightarrow> (pos \<Rightarrow> ('f, 'v) term) \<Rightarrow> ('f, 'v) term" where
+  "replace_par (Var x) P t = (if [] \<in> P then t [] else Var x)"
+| "replace_par (Fun f ss) P t = (if [] \<in> P then t [] else
+    Fun f (map (\<lambda>(i, s). replace_par s {p. i # p \<in> P} (\<lambda>p. t (i # p))) (zip [0..<length ss] ss)))"
+  by pat_completeness auto
+termination
+  by (relation "measure (\<lambda>(s, _, _). size s)")
+    (auto dest!: set_zip_rightD intro: le_imp_less_Suc size_list_estimation')
+
+lemma replace_par_root: "[] \<in> P \<Longrightarrow> replace_par s P t = t []"
+  by (cases s) auto
+
+lemma replace_par_Var: "[] \<notin> P \<Longrightarrow> replace_par (Var x) P t = Var x"
+  by simp
+
+lemma replace_par_Fun:
+  "[] \<notin> P \<Longrightarrow> replace_par (Fun f ss) P t =
+    Fun f (map (\<lambda>i. replace_par (ss ! i) {p. i # p \<in> P} (\<lambda>p. t (i # p))) [0..<length ss])"
+  by (auto intro!: nth_equalityI)
+
+declare replace_par.simps [simp del]
+
+lemma replace_par_empty [simp]: "replace_par s {} t = s"
+proof (induct s arbitrary: t)
+  case (Fun f ss)
+  then show ?case by (auto simp: replace_par_Fun intro!: nth_equalityI)
+qed (simp add: replace_par_Var)
+
+lemma replace_par_cong:
+  "(\<And>p. p \<in> P \<Longrightarrow> c p = d p) \<Longrightarrow> replace_par s P c = replace_par s P d"
+proof (induct s arbitrary: P c d)
+  case (Var x)
+  then show ?case by (cases "[] \<in> P") (auto simp: replace_par_root replace_par_Var)
+next
+  case (Fun f ss)
+  show ?case
+  proof (cases "[] \<in> P")
+    case False
+    have "replace_par (ss ! i) {p. i # p \<in> P} (\<lambda>p. c (i # p)) =
+        replace_par (ss ! i) {p. i # p \<in> P} (\<lambda>p. d (i # p))" if "i < length ss" for i
+      by (rule Fun.hyps[OF nth_mem[OF that]]) (simp add: Fun.prems)
+    then show ?thesis using False by (simp add: replace_par_Fun)
+  qed (simp add: replace_par_root Fun.prems)
+qed
+
+lemma replace_par_subt_at:
+  assumes "parallel_set P" and "P \<subseteq> poss s" and "q \<in> P"
+  shows "replace_par s P c |_ q = c q"
+  using assms
+proof (induct q arbitrary: s P c)
   case Nil
-  then show ?case using assms(1) by simp
+  then show ?case by (simp add: replace_par_root)
+next
+  case (Cons i q)
+  then obtain f ss where s: "s = Fun f ss" and i: "i < length ss"
+    by (cases s) auto
+  have "[] \<notin> P" using Cons.prems parallel_set_Nil by blast
+  moreover have "parallel_set {p. i # p \<in> P}"
+    using parallel_set_below[OF Cons.prems(1), of "[i]"] by simp
+  moreover have "{p. i # p \<in> P} \<subseteq> poss (ss ! i)" using Cons.prems(2) s by auto
+  ultimately show ?case
+    using Cons.prems(3) Cons.hyps[of "{p. i # p \<in> P}" "ss ! i"] s i by (simp add: replace_par_Fun)
+qed
+
+lemma replace_par_subt_at_parallel:
+  assumes "q \<in> poss s" and "\<forall>p \<in> P. q \<parallel> p"
+  shows "replace_par s P c |_ q = s |_ q"
+  using assms
+proof (induct q arbitrary: s P c)
+  case (Cons i q)
+  then obtain f ss where s: "s = Fun f ss" and i: "i < length ss" and q: "q \<in> poss (ss ! i)"
+    by (cases s) auto
+  have "[] \<notin> P" using Cons.prems(2) by auto
+  moreover have "\<forall>p \<in> {p. i # p \<in> P}. q \<parallel> p" using Cons.prems(2) by auto
+  ultimately show ?case
+    using Cons.hyps[OF q, of "{p. i # p \<in> P}"] s i by (simp add: replace_par_Fun)
+qed simp
+
+lemma replace_par_poss:
+  assumes "q \<in> poss s" and "\<forall>p \<in> P. \<not> p <\<^sub>p q"
+  shows "q \<in> poss (replace_par s P c)"
+  using assms
+proof (induct q arbitrary: s P c)
+  case (Cons i q)
+  then obtain f ss where s: "s = Fun f ss" and i: "i < length ss" and q: "q \<in> poss (ss ! i)"
+    by (cases s) auto
+  have "[] \<notin> P" using Cons.prems(2) unfolding prefix_less_def by auto
+  moreover have "\<forall>p \<in> {p. i # p \<in> P}. \<not> p <\<^sub>p q" using Cons.prems(2) by auto
+  ultimately show ?case
+    using Cons.hyps[OF q, of "{p. i # p \<in> P}"] s i by (simp add: replace_par_Fun)
+qed simp
+
+lemma replace_par_overwrite:
+  assumes "parallel_set Q"
+  shows "replace_par (replace_par s Q a) Q b = replace_par s Q b"
+  using assms
+proof (induct s arbitrary: Q a b)
+  case (Var x)
+  then show ?case by (cases "[] \<in> Q") (auto simp: replace_par_root replace_par_Var)
+next
+  case (Fun f ss)
+  show ?case
+  proof (cases "[] \<in> Q")
+    case False
+    have "parallel_set {p. i # p \<in> Q}" for i
+      using parallel_set_below[OF Fun.prems, of "[i]"] by simp
+    then show ?thesis using False Fun.hyps[OF nth_mem] by (auto simp: replace_par_Fun)
+  qed (simp add: replace_par_root)
+qed
+
+lemma replace_par_id: "replace_par s P (\<lambda>p. s |_ p) = s"
+proof (induct s arbitrary: P)
+  case (Var x)
+  then show ?case by (cases "[] \<in> P") (auto simp: replace_par_root replace_par_Var)
+next
+  case (Fun f ss)
+  then show ?case
+    by (cases "[] \<in> P") (auto simp: replace_par_root replace_par_Fun intro!: nth_equalityI)
+qed
+
+lemma replace_par_subst:
+  assumes "P \<subseteq> poss s"
+  shows "\<delta> \<cdot> replace_par s P c = replace_par (\<delta> \<cdot> s) P (\<lambda>p. \<delta> \<cdot> c p)"
+  using assms
+proof (induct s arbitrary: P c)
+  case (Var x)
+  then have "P = {} \<or> P = {[]}" by auto
+  then show ?case by (auto simp: replace_par_root)
+next
+  case (Fun f ss)
+  show ?case
+  proof (cases "[] \<in> P")
+    case False
+    have "{p. i # p \<in> P} \<subseteq> poss (ss ! i)" if "i < length ss" for i
+      using Fun.prems that by auto
+    then show ?thesis using False Fun.hyps[OF nth_mem] by (auto simp: replace_par_Fun)
+  qed (simp add: replace_par_root)
+qed
+
+text \<open>Replacing at all variable positions of \<open>t\<close> in an instance \<open>\<sigma>(t)\<close>.\<close>
+
+definition var_poss :: "('f, 'v) term \<Rightarrow> pos set" where
+  "var_poss t = {p \<in> poss t. \<exists>x. t |_ p = Var x}"
+
+lemma var_poss_Var [simp]: "var_poss (Var x) = {[]}"
+  by (auto simp: var_poss_def)
+
+lemma var_poss_Fun: "var_poss (Fun f ts) = {i # p | i p. i < length ts \<and> p \<in> var_poss (ts ! i)}"
+proof (intro set_eqI iffI)
+  fix x assume "x \<in> var_poss (Fun f ts)"
+  then show "x \<in> {i # p | i p. i < length ts \<and> p \<in> var_poss (ts ! i)}"
+    by (cases x) (auto simp: var_poss_def)
+qed (auto simp: var_poss_def)
+
+lemma var_poss_subset: "var_poss t \<subseteq> poss t"
+  by (auto simp: var_poss_def)
+
+lemma parallel_set_var_poss: "parallel_set (var_poss t)"
+proof (induct t)
+  case (Fun f ts)
+  show ?case
+    unfolding parallel_set_def var_poss_Fun
+    using Fun.hyps[OF nth_mem] by (fastforce simp: parallel_set_def)
+qed (simp add: parallel_set_def)
+
+lemma replace_par_var_poss: "replace_par (\<sigma> \<cdot> t) (var_poss t) (\<lambda>p. \<tau> \<cdot> (t |_ p)) = \<tau> \<cdot> t"
+proof (induct t)
+  case (Var x)
+  then show ?case by (simp add: replace_par_root)
+next
+  case (Fun f ts)
+  have "{p. i # p \<in> var_poss (Fun f ts)} = var_poss (ts ! i)" if "i < length ts" for i
+    using that by (auto simp: var_poss_Fun)
+  then show ?case
+    using Fun.hyps[OF nth_mem] by (auto simp: replace_par_Fun var_poss_Fun intro!: nth_equalityI)
+qed
+
+text \<open>Every position of an instance \<open>\<sigma>(t)\<close> is a position of \<open>t\<close> or lies below a variable
+  position of \<open>t\<close>.\<close>
+
+lemma poss_subst_apply_var_poss:
+  "p \<in> poss (\<sigma> \<cdot> t) \<Longrightarrow> p \<in> poss t \<or> (\<exists>q \<in> var_poss t. q \<le>\<^sub>p p)"
+proof (induct t arbitrary: p)
+  case (Fun f ts)
+  show ?case
+  proof (cases p)
+    case (Cons i p')
+    with Fun.prems have i: "i < length ts" and p': "p' \<in> poss (\<sigma> \<cdot> ts ! i)" by auto
+    from Fun.hyps[OF nth_mem[OF i] p'] show ?thesis
+    proof
+      assume "\<exists>q \<in> var_poss (ts ! i). q \<le>\<^sub>p p'"
+      then obtain q where "q \<in> var_poss (ts ! i)" "q \<le>\<^sub>p p'" by blast
+      then have "i # q \<in> var_poss (Fun f ts)" "i # q \<le>\<^sub>p p" using Cons i by (auto simp: var_poss_Fun)
+      then show ?thesis by blast
+    qed (simp add: Cons i)
+  qed simp
+qed (auto simp: var_poss_def)
+
+lemma replace_par_nested:
+  assumes "parallel_set Q" and "Q \<subseteq> poss s"
+  shows "replace_par s {q @ p | q p. q \<in> Q \<and> p \<in> P q} c =
+    replace_par s Q (\<lambda>q. replace_par (s |_ q) (P q) (\<lambda>p. c (q @ p)))"
+  using assms
+proof (induct s arbitrary: Q P c)
+  case (Var x)
+  then have "Q = {} \<or> Q = {[]}" by auto
+  moreover have "{q @ p | q p. q \<in> {[]} \<and> p \<in> P q} = P []" by auto
+  ultimately show ?case by (auto simp: replace_par_root)
+next
+  case (Fun f ss)
+  let ?PP = "{q @ p | q p. q \<in> Q \<and> p \<in> P q}"
+  show ?case
+  proof (cases "[] \<in> Q")
+    case True
+    then have Q: "Q = {[]}" using Fun.prems(1) parallel_set_Nil by blast
+    have "?PP = P []" using Q by auto
+    then show ?thesis using Q by (simp add: replace_par_root)
+  next
+    case False
+    have nil: "[] \<notin> ?PP" using False by auto
+    have sets: "{p. i # p \<in> ?PP} = {q @ p | q p. q \<in> {q. i # q \<in> Q} \<and> p \<in> P (i # q)}" for i
+    proof (intro set_eqI iffI)
+      fix x assume "x \<in> {p. i # p \<in> ?PP}"
+      then obtain q p where "i # x = q @ p" "q \<in> Q" "p \<in> P q" by blast
+      moreover from this have "q \<noteq> []" using False by auto
+      ultimately show "x \<in> {q @ p | q p. q \<in> {q. i # q \<in> Q} \<and> p \<in> P (i # q)}"
+        by (cases q) auto
+    next
+      fix x assume "x \<in> {q @ p | q p. q \<in> {q. i # q \<in> Q} \<and> p \<in> P (i # q)}"
+      then obtain q p where "x = q @ p" "i # q \<in> Q" "p \<in> P (i # q)" by blast
+      moreover have "i # x = (i # q) @ p" using \<open>x = q @ p\<close> by simp
+      ultimately show "x \<in> {p. i # p \<in> ?PP}" by blast
+    qed
+    have "replace_par (ss ! i) {p. i # p \<in> ?PP} (\<lambda>p. c (i # p)) =
+        replace_par (ss ! i) {q. i # q \<in> Q}
+          (\<lambda>q. replace_par (Fun f ss |_ (i # q)) (P (i # q)) (\<lambda>p. c ((i # q) @ p)))"
+      if i: "i < length ss" for i
+    proof -
+      have "parallel_set {q. i # q \<in> Q}"
+        using parallel_set_below[OF Fun.prems(1), of "[i]"] by simp
+      moreover have "{q. i # q \<in> Q} \<subseteq> poss (ss ! i)" using Fun.prems(2) by auto
+      ultimately show ?thesis
+        unfolding sets
+        using Fun.hyps[OF nth_mem[OF i], of "{q. i # q \<in> Q}" "\<lambda>q. P (i # q)" "\<lambda>p. c (i # p)"]
+        by simp
+    qed
+    then show ?thesis using False nil by (simp add: replace_par_Fun)
+  qed
+qed
+
+lemma parallel_set_nested:
+  assumes "parallel_set Q" and "\<And>q. q \<in> Q \<Longrightarrow> parallel_set (P q)"
+  shows "parallel_set {q @ p | q p. q \<in> Q \<and> p \<in> P q}"
+  unfolding parallel_set_def
+proof (intro ballI)
+  fix x y assume "x \<in> {q @ p | q p. q \<in> Q \<and> p \<in> P q}" and "y \<in> {q @ p | q p. q \<in> Q \<and> p \<in> P q}"
+  then obtain q p q' p' where x: "x = q @ p" "q \<in> Q" "p \<in> P q" and y: "y = q' @ p'" "q' \<in> Q" "p' \<in> P q'"
+    by blast
+  show "x \<parallel> y \<or> x = y"
+  proof (cases "q = q'")
+    case True
+    then show ?thesis using x y assms(2)[of q] unfolding parallel_set_def by auto
+  next
+    case False
+    then show ?thesis using x y assms(1) parallel_append_parallel unfolding parallel_set_def by blast
+  qed
+qed
+
+lemma poss_nested:
+  assumes "Q \<subseteq> poss s" and "\<And>q. q \<in> Q \<Longrightarrow> P q \<subseteq> poss (s |_ q)"
+  shows "{q @ p | q p. q \<in> Q \<and> p \<in> P q} \<subseteq> poss s"
+  using assms poss_subt_at by blast
+
+text \<open>Relating \<open>s[t\<^sub>p]\<^sub>p\<^sub>\<in>\<^sub>P\<close> to its recursive description.\<close>
+
+lemma replace_par_insert:
+  assumes "p \<in> poss s" and "\<forall>q \<in> Q. p \<parallel> q"
+  shows "replace_par (s\<lbrakk>p \<leftarrow> t p\<rbrakk>) Q t = replace_par s (insert p Q) t"
+  using assms
+proof (induct p arbitrary: s Q t)
+  case Nil
+  then have "Q = {}" by auto
+  then show ?case by (simp add: replace_par_root)
 next
   case (Cons i p)
   then obtain f ss where s: "s = Fun f ss" and i: "i < length ss" and p: "p \<in> poss (ss ! i)"
     by (cases s) auto
+  have Q: "[] \<notin> Q" using Cons.prems(2) by auto
+  have IH: "replace_par ((ss ! i)\<lbrakk>p \<leftarrow> t (i # p)\<rbrakk>) {q. i # q \<in> Q} (\<lambda>q. t (i # q)) =
+      replace_par (ss ! i) {q. i # q \<in> insert (i # p) Q} (\<lambda>q. t (i # q))"
+  proof -
+    have "{q. i # q \<in> insert (i # p) Q} = insert p {q. i # q \<in> Q}" by auto
+    moreover have "\<forall>q \<in> {q. i # q \<in> Q}. p \<parallel> q" using Cons.prems(2) by auto
+    ultimately show ?thesis using Cons.hyps[OF p, of "{q. i # q \<in> Q}" "\<lambda>q. t (i # q)"] by simp
+  qed
   show ?case
-    unfolding s using Cons.hyps[OF p] i
-    by (auto intro!: par_rstep.args simp: nth_list_update)
+    unfolding s using Q i IH by (auto simp: replace_par_Fun nth_list_update intro!: nth_equalityI)
 qed
 
-lemma par_rstep_subst:
-  assumes "\<And>x. x \<in> vars t \<Longrightarrow> (\<sigma> x, \<tau> x) \<in> par_rstep R"
-  shows "(\<sigma> \<cdot> t, \<tau> \<cdot> t) \<in> par_rstep R"
+lemma replace_at_list_replace_par:
+  assumes "distinct ps" and "parallel_set (set ps)" and "set ps \<subseteq> poss s"
+  shows "replace_at_list s (map (\<lambda>p. (p, t p)) ps) = replace_par s (set ps) t"
   using assms
-proof (induct t)
-  case (Fun f ts)
-  show ?case
-    by (simp, rule par_rstep.args) (auto intro!: Fun.hyps Fun.prems bexI[OF _ nth_mem])
+proof (induct ps arbitrary: s)
+  case (Cons p ps)
+  have par: "\<forall>q \<in> set ps. p \<parallel> q"
+    using Cons.prems(1,2) by (auto intro: parallel_setD)
+  have "set ps \<subseteq> poss (s\<lbrakk>p \<leftarrow> t p\<rbrakk>)"
+    using Cons.prems(3) par by (auto intro: parallel_poss_replace_at)
+  moreover have "parallel_set (set ps)" using Cons.prems(2) by (auto simp: parallel_set_def)
+  ultimately show ?case
+    using Cons.hyps[of "s\<lbrakk>p \<leftarrow> t p\<rbrakk>"] Cons.prems(1,3) replace_par_insert[of p s "set ps" t] par
+    by simp
 qed simp
+
+lemma replace_at_set_replace_par:
+  assumes "parallel_set P" and "P \<subseteq> poss s"
+  shows "s\<lbrakk>P \<Leftarrow> t\<rbrakk> = replace_par s P t"
+proof -
+  have "finite P" using assms(2) by (rule finite_subset) simp
+  then have "\<exists>ps. distinct ps \<and> set ps = P" by (metis finite_distinct_list)
+  then have "distinct (SOME ps. distinct ps \<and> set ps = P) \<and> set (SOME ps. distinct ps \<and> set ps = P) = P"
+    by (rule someI_ex)
+  then show ?thesis
+    unfolding replace_at_set_def using assms replace_at_list_replace_par by metis
+qed
+
+text \<open>The order of the replacements in \<open>s[t\<^sub>p]\<^sub>p\<^sub>\<in>\<^sub>P\<close> does not matter.\<close>
+
+lemma replace_at_set_any_order:
+  assumes "parallel_set P" and "P \<subseteq> poss s" and "distinct ps" and "set ps = P"
+  shows "s\<lbrakk>P \<Leftarrow> t\<rbrakk> = replace_at_list s (map (\<lambda>p. (p, t p)) ps)"
+  using assms replace_at_list_replace_par replace_at_set_replace_par by metis
+
+text \<open>Basic properties of \<open>s[t\<^sub>p]\<^sub>p\<^sub>\<in>\<^sub>P\<close>.\<close>
+
+lemma replace_at_set_empty [simp]: "s\<lbrakk>{} \<Leftarrow> t\<rbrakk> = s"
+  by (simp add: replace_at_set_replace_par)
+
+lemma replace_at_set_singleton: "p \<in> poss s \<Longrightarrow> s\<lbrakk>{p} \<Leftarrow> t\<rbrakk> = s\<lbrakk>p \<leftarrow> t p\<rbrakk>"
+  using replace_at_set_any_order[of "{p}" s "[p]" t] by simp
+
+lemma replace_at_set_cong:
+  assumes "parallel_set P" and "P \<subseteq> poss s" and "\<And>p. p \<in> P \<Longrightarrow> c p = d p"
+  shows "s\<lbrakk>P \<Leftarrow> c\<rbrakk> = s\<lbrakk>P \<Leftarrow> d\<rbrakk>"
+  unfolding replace_at_set_replace_par[OF assms(1,2)] by (rule replace_par_cong) (rule assms(3))
+
+lemma replace_at_set_subt_at:
+  assumes "parallel_set P" and "P \<subseteq> poss s" and "q \<in> P"
+  shows "s\<lbrakk>P \<Leftarrow> c\<rbrakk> |_ q = c q"
+  using assms replace_par_subt_at by (simp add: replace_at_set_replace_par)
+
+lemma poss_replace_at_set:
+  assumes "parallel_set P" and "P \<subseteq> poss s" and "q \<in> poss s" and "\<forall>p \<in> P. \<not> p <\<^sub>p q"
+  shows "q \<in> poss (s\<lbrakk>P \<Leftarrow> c\<rbrakk>)"
+  using assms replace_par_poss by (simp add: replace_at_set_replace_par)
+
+lemma poss_replace_at_set_subset:
+  assumes "parallel_set P" and "P \<subseteq> poss s"
+  shows "P \<subseteq> poss (s\<lbrakk>P \<Leftarrow> c\<rbrakk>)"
+  using assms poss_replace_at_set parallel_not_less by blast
+
+lemma replace_at_set_overwrite:
+  assumes "parallel_set P" and "P \<subseteq> poss s"
+  shows "s\<lbrakk>P \<Leftarrow> a\<rbrakk>\<lbrakk>P \<Leftarrow> b\<rbrakk> = s\<lbrakk>P \<Leftarrow> b\<rbrakk>"
+  using assms poss_replace_at_set_subset[OF assms] replace_par_overwrite
+  by (simp add: replace_at_set_replace_par)
+
+lemma replace_at_set_id:
+  assumes "parallel_set P" and "P \<subseteq> poss s"
+  shows "s\<lbrakk>P \<Leftarrow> \<lambda>p. s |_ p\<rbrakk> = s"
+  using assms replace_par_id by (simp add: replace_at_set_replace_par)
+
+lemma subst_replace_at_set:
+  assumes "parallel_set P" and "P \<subseteq> poss s"
+  shows "\<delta> \<cdot> s\<lbrakk>P \<Leftarrow> c\<rbrakk> = (\<delta> \<cdot> s)\<lbrakk>P \<Leftarrow> \<lambda>p. \<delta> \<cdot> c p\<rbrakk>"
+proof -
+  have "P \<subseteq> poss (\<delta> \<cdot> s)" using assms(2) poss_subst_apply by blast
+  then show ?thesis using assms replace_par_subst by (simp add: replace_at_set_replace_par)
+qed
+
+lemma replace_at_set_var_poss: "(\<sigma> \<cdot> t)\<lbrakk>var_poss t \<Leftarrow> \<lambda>p. \<tau> \<cdot> (t |_ p)\<rbrakk> = \<tau> \<cdot> t"
+proof -
+  have "var_poss t \<subseteq> poss (\<sigma> \<cdot> t)" using var_poss_subset poss_subst_apply by blast
+  then show ?thesis
+    by (simp add: replace_at_set_replace_par[OF parallel_set_var_poss] replace_par_var_poss)
+qed
+
+lemma replace_at_set_nested:
+  assumes "parallel_set Q" and "Q \<subseteq> poss s"
+    and "\<And>q. q \<in> Q \<Longrightarrow> parallel_set (P q)" and "\<And>q. q \<in> Q \<Longrightarrow> P q \<subseteq> poss (s |_ q)"
+  shows "s\<lbrakk>{q @ p | q p. q \<in> Q \<and> p \<in> P q} \<Leftarrow> c\<rbrakk> = s\<lbrakk>Q \<Leftarrow> \<lambda>q. (s |_ q)\<lbrakk>P q \<Leftarrow> \<lambda>p. c (q @ p)\<rbrakk>\<rbrakk>"
+proof -
+  have "s\<lbrakk>{q @ p | q p. q \<in> Q \<and> p \<in> P q} \<Leftarrow> c\<rbrakk> =
+      replace_par s Q (\<lambda>q. replace_par (s |_ q) (P q) (\<lambda>p. c (q @ p)))"
+    using replace_at_set_replace_par[OF parallel_set_nested[OF assms(1,3)] poss_nested[OF assms(2,4)]]
+      replace_par_nested[OF assms(1,2)] by simp
+  also have "\<dots> = replace_par s Q (\<lambda>q. (s |_ q)\<lbrakk>P q \<Leftarrow> \<lambda>p. c (q @ p)\<rbrakk>)"
+    using assms by (intro replace_par_cong) (simp add: replace_at_set_replace_par)
+  finally show ?thesis using assms by (simp add: replace_at_set_replace_par)
+qed
+
+subsubsection \<open>Basic properties of parallel reduction\<close>
+
+lemma par_rstep_atI:
+  assumes "parallel_set P" and "P \<subseteq> poss s"
+    and "\<And>p. p \<in> P \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
+  shows "par_rstep_at R P s (s\<lbrakk>P \<Leftarrow> c\<rbrakk>)"
+  using assms unfolding par_rstep_at_def by blast
+
+lemma par_rstep_atE:
+  assumes "par_rstep_at R P s t"
+  obtains c where "parallel_set P" and "P \<subseteq> poss s"
+    and "\<And>p. p \<in> P \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r" and "t = s\<lbrakk>P \<Leftarrow> c\<rbrakk>"
+  using assms unfolding par_rstep_at_def by blast
+
+lemma par_rstepI: "par_rstep_at R P s t \<Longrightarrow> (s, t) \<in> par_rstep R"
+  unfolding par_rstep_def by blast
+
+lemma par_rstepE:
+  assumes "(s, t) \<in> par_rstep R"
+  obtains P where "par_rstep_at R P s t"
+  using assms unfolding par_rstep_def by blast
+
+text \<open>With \<open>P = \<emptyset>\<close> we see that \<open>\<rightrightarrows>\<close> is reflexive.\<close>
+
+lemma par_rstep_at_empty: "par_rstep_at R {} t t"
+  unfolding par_rstep_at_def by simp
+
+lemma par_rstep_refl [simp]: "(t, t) \<in> par_rstep R"
+  by (rule par_rstepI[OF par_rstep_at_empty])
 
 text \<open>Fact 6.3.8: \<open>\<rightarrow> \<subseteq> \<rightrightarrows> \<subseteq> \<rightarrow>\<^sup>*\<close>.\<close>
 
 lemma rstep_subset_par_rstep: "rstep R \<subseteq> par_rstep R"
 proof (rule subrelI)
   fix s t assume "(s, t) \<in> rstep R"
-  then obtain l r p \<sigma> where "(l, r) \<in> R" "p \<in> poss s" "s |_ p = \<sigma> \<cdot> l" "t = s\<lbrakk>p \<leftarrow> \<sigma> \<cdot> r\<rbrakk>"
+  then obtain l r p \<sigma> where R: "(l, r) \<in> R" and p: "p \<in> poss s" and s: "s |_ p = \<sigma> \<cdot> l"
+    and t: "t = s\<lbrakk>p \<leftarrow> \<sigma> \<cdot> r\<rbrakk>"
     by (rule rstepE)
-  then show "(s, t) \<in> par_rstep R"
-    using par_rstep_ctxt[OF par_rstep.rule, of l r R p s \<sigma>] replace_at_subt_at[of p s] by simp
+  have "par_rstep_at R {p} s (s\<lbrakk>{p} \<Leftarrow> \<lambda>_. \<sigma> \<cdot> r\<rbrakk>)" using R p s by (intro par_rstep_atI) auto
+  then show "(s, t) \<in> par_rstep R" using p t by (simp add: replace_at_set_singleton par_rstepI)
 qed
+
+lemma par_rstep_rule: "(l, r) \<in> R \<Longrightarrow> (\<sigma> \<cdot> l, \<sigma> \<cdot> r) \<in> par_rstep R"
+  using rstep_subset_par_rstep rstepI[where p = "[]"] by fastforce
+
+text \<open>Contracting the redexes at \<open>p\<^sub>1, \<dots>, p\<^sub>n\<close> one at a time.\<close>
+
+lemma replace_at_list_rsteps:
+  assumes "distinct ps" and "parallel_set (set ps)" and "set ps \<subseteq> poss s"
+    and "\<forall>p \<in> set ps. \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
+  shows "(s, replace_at_list s (map (\<lambda>p. (p, c p)) ps)) \<in> (rstep R)\<^sup>*"
+  using assms
+proof (induct ps arbitrary: s)
+  case (Cons p ps)
+  from Cons.prems(4) obtain l r \<sigma> where R: "(l, r) \<in> R" "s |_ p = \<sigma> \<cdot> l" "c p = \<sigma> \<cdot> r" by auto
+  have par: "\<forall>q \<in> set ps. p \<parallel> q" using Cons.prems(1,2) by (auto intro: parallel_setD)
+  have p: "p \<in> poss s" using Cons.prems(3) by simp
+  have "(s, s\<lbrakk>p \<leftarrow> c p\<rbrakk>) \<in> rstep R" using R p by (intro rstepI) auto
+  moreover have "(s\<lbrakk>p \<leftarrow> c p\<rbrakk>, replace_at_list (s\<lbrakk>p \<leftarrow> c p\<rbrakk>) (map (\<lambda>p. (p, c p)) ps)) \<in> (rstep R)\<^sup>*"
+  proof (rule Cons.hyps)
+    show "distinct ps" using Cons.prems(1) by simp
+    show "parallel_set (set ps)" using Cons.prems(2) by (rule parallel_set_subset) auto
+    show "set ps \<subseteq> poss (s\<lbrakk>p \<leftarrow> c p\<rbrakk>)"
+      using Cons.prems(3) par p by (auto intro: parallel_poss_replace_at)
+    show "\<forall>q \<in> set ps. \<exists>l r \<sigma>. (l, r) \<in> R \<and> s\<lbrakk>p \<leftarrow> c p\<rbrakk> |_ q = \<sigma> \<cdot> l \<and> c q = \<sigma> \<cdot> r"
+    proof
+      fix q assume q: "q \<in> set ps"
+      then have "s\<lbrakk>p \<leftarrow> c p\<rbrakk> |_ q = s |_ q"
+        using par Cons.prems(3) p by (intro parallel_subt_at_replace_at) auto
+      then show "\<exists>l r \<sigma>. (l, r) \<in> R \<and> s\<lbrakk>p \<leftarrow> c p\<rbrakk> |_ q = \<sigma> \<cdot> l \<and> c q = \<sigma> \<cdot> r"
+        using Cons.prems(4) q by auto
+    qed
+  qed
+  ultimately show ?case by (auto intro: converse_rtrancl_into_rtrancl)
+qed simp
 
 lemma par_rstep_subset_rtrancl: "par_rstep R \<subseteq> (rstep R)\<^sup>*"
 proof (rule subrelI)
   fix s t assume "(s, t) \<in> par_rstep R"
-  then show "(s, t) \<in> (rstep R)\<^sup>*"
-  proof (induct rule: par_rstep.induct)
-    case (args ss ts f)
-    then show ?case by (intro closed_opsD[OF closed_ops_rtrancl[OF compatible_ops_rstep]]) auto
-  next
-    case (rule l r \<sigma>)
-    then show ?case by (auto intro!: rstepI[where p = "[]"])
-  qed simp
+  then obtain P c where P: "parallel_set P" "P \<subseteq> poss s"
+    and redex: "\<forall>p \<in> P. \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r" and t: "t = s\<lbrakk>P \<Leftarrow> c\<rbrakk>"
+    unfolding par_rstep_def par_rstep_at_def by blast
+  have "finite P" using P(2) by (rule finite_subset) simp
+  then obtain ps where ps: "distinct ps" "set ps = P" using finite_distinct_list by metis
+  have "t = replace_at_list s (map (\<lambda>p. (p, c p)) ps)" using replace_at_set_any_order[OF P ps] t by simp
+  then show "(s, t) \<in> (rstep R)\<^sup>*" using replace_at_list_rsteps[OF ps(1)] P redex ps(2) by simp
 qed
 
-lemma linear_term_subt_at: "linear_term t \<Longrightarrow> p \<in> poss t \<Longrightarrow> linear_term (t |_ p)"
-proof (induct p arbitrary: t)
-  case (Cons i p)
-  then show ?case by (cases t) auto
+text \<open>Parallel steps in parallel subterms combine into one parallel step.\<close>
+
+lemma par_rstep_at_nested:
+  assumes "parallel_set Q" and "Q \<subseteq> poss s"
+    and "\<And>q. q \<in> Q \<Longrightarrow> par_rstep_at R (P q) (s |_ q) (u q)"
+  shows "par_rstep_at R {q @ p | q p. q \<in> Q \<and> p \<in> P q} s (s\<lbrakk>Q \<Leftarrow> u\<rbrakk>)"
+proof -
+  let ?PP = "{q @ p | q p. q \<in> Q \<and> p \<in> P q}"
+  have Pq: "parallel_set (P q)" "P q \<subseteq> poss (s |_ q)" if "q \<in> Q" for q
+    using assms(3)[OF that] unfolding par_rstep_at_def by blast+
+  have "\<forall>q \<in> Q. \<exists>c. (\<forall>p \<in> P q. \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ q |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r) \<and>
+      u q = (s |_ q)\<lbrakk>P q \<Leftarrow> c\<rbrakk>"
+    using assms(3) unfolding par_rstep_at_def by blast
+  then obtain C where C: "\<And>q. q \<in> Q \<Longrightarrow>
+      (\<forall>p \<in> P q. \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ q |_ p = \<sigma> \<cdot> l \<and> C q p = \<sigma> \<cdot> r) \<and>
+      u q = (s |_ q)\<lbrakk>P q \<Leftarrow> C q\<rbrakk>"
+    by metis
+  have uniq: "(THE q. q \<in> Q \<and> q \<le>\<^sub>p q' @ p) = q'" if "q' \<in> Q" for q' p
+  proof (rule the_equality)
+    show "q' \<in> Q \<and> q' \<le>\<^sub>p q' @ p" using that by simp
+    fix q assume q: "q \<in> Q \<and> q \<le>\<^sub>p q' @ p"
+    then have "q \<le>\<^sub>p q' \<or> q' \<le>\<^sub>p q" using prefix_le_cases[of q "q' @ p" q'] by simp
+    then show "q = q'" using that q assms(1) unfolding parallel_set_def parallel_def by blast
+  qed
+  define c where "c x = (let q = THE q. q \<in> Q \<and> q \<le>\<^sub>p x in C q (drop (length q) x))" for x
+  have c: "c (q @ p) = C q p" if "q \<in> Q" for q p using uniq[OF that] by (simp add: c_def)
+  show ?thesis
+    unfolding par_rstep_at_def
+  proof (intro conjI exI)
+    show par: "parallel_set ?PP" using parallel_set_nested assms(1) Pq by blast
+    show poss: "?PP \<subseteq> poss s" using poss_nested assms(2) Pq by blast
+    show "\<forall>x \<in> ?PP. \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ x = \<sigma> \<cdot> l \<and> c x = \<sigma> \<cdot> r"
+    proof
+      fix x assume "x \<in> ?PP"
+      then obtain q p where x: "x = q @ p" "q \<in> Q" "p \<in> P q" by blast
+      then have "q @ p \<in> poss s" using assms(2) Pq(2) poss_subt_at by blast
+      then have "s |_ x = s |_ q |_ p" using x(1) by (simp add: subt_at_append)
+      then show "\<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ x = \<sigma> \<cdot> l \<and> c x = \<sigma> \<cdot> r" using C[OF x(2)] x c by auto
+    qed
+    have "s\<lbrakk>?PP \<Leftarrow> c\<rbrakk> = s\<lbrakk>Q \<Leftarrow> \<lambda>q. (s |_ q)\<lbrakk>P q \<Leftarrow> \<lambda>p. c (q @ p)\<rbrakk>\<rbrakk>"
+      using assms(1,2) Pq by (rule replace_at_set_nested)
+    also have "\<dots> = s\<lbrakk>Q \<Leftarrow> u\<rbrakk>"
+      using assms(1,2) Pq C c by (intro replace_at_set_cong) (auto intro: replace_at_set_cong)
+    finally show "s\<lbrakk>Q \<Leftarrow> u\<rbrakk> = s\<lbrakk>?PP \<Leftarrow> c\<rbrakk>" by simp
+  qed
+qed
+
+lemma par_rstep_replace_at_set:
+  assumes "parallel_set Q" and "Q \<subseteq> poss s" and "\<And>q. q \<in> Q \<Longrightarrow> (s |_ q, u q) \<in> par_rstep R"
+  shows "(s, s\<lbrakk>Q \<Leftarrow> u\<rbrakk>) \<in> par_rstep R"
+proof -
+  have "\<forall>q \<in> Q. \<exists>P. par_rstep_at R P (s |_ q) (u q)" using assms(3) unfolding par_rstep_def by blast
+  then obtain P where "\<And>q. q \<in> Q \<Longrightarrow> par_rstep_at R (P q) (s |_ q) (u q)" by metis
+  from par_rstep_at_nested[OF assms(1,2) this] show ?thesis by (rule par_rstepI)
+qed
+
+text \<open>Lemma 6.4.1: \<open>\<rightrightarrows>\<close> is closed under contexts.\<close>
+
+lemma par_rstep_ctxt:
+  assumes "(u, v) \<in> par_rstep R" and "p \<in> poss s"
+  shows "(s\<lbrakk>p \<leftarrow> u\<rbrakk>, s\<lbrakk>p \<leftarrow> v\<rbrakk>) \<in> par_rstep R"
+proof -
+  have p: "p \<in> poss (s\<lbrakk>p \<leftarrow> u\<rbrakk>)" using poss_replace_at[OF assms(2), of "[]"] by simp
+  have "s\<lbrakk>p \<leftarrow> u\<rbrakk> |_ p = u" using subt_at_replace_at_append[OF assms(2), of "[]"] by simp
+  then have "(s\<lbrakk>p \<leftarrow> u\<rbrakk>, s\<lbrakk>p \<leftarrow> u\<rbrakk>\<lbrakk>{p} \<Leftarrow> \<lambda>_. v\<rbrakk>) \<in> par_rstep R"
+    using assms(1) p by (intro par_rstep_replace_at_set) auto
+  moreover have "s\<lbrakk>p \<leftarrow> u\<rbrakk>\<lbrakk>{p} \<Leftarrow> \<lambda>_. v\<rbrakk> = s\<lbrakk>p \<leftarrow> v\<rbrakk>"
+    using p replace_at_replace_at_append[OF assms(2), of "[]"] by (simp add: replace_at_set_singleton)
+  ultimately show ?thesis by simp
+qed
+
+text \<open>Lemma 6.4.2: if \<open>\<sigma>(x) \<rightrightarrows> \<tau>(x)\<close> for all \<open>x \<in> Var(t)\<close>, then \<open>\<sigma>(t) \<rightrightarrows> \<tau>(t)\<close>: contract, at each
+  variable position of \<open>t\<close>, the parallel step \<open>\<sigma>(x) \<rightrightarrows> \<tau>(x)\<close>.\<close>
+
+lemma par_rstep_subst:
+  assumes "\<And>x. x \<in> vars t \<Longrightarrow> (\<sigma> x, \<tau> x) \<in> par_rstep R"
+  shows "(\<sigma> \<cdot> t, \<tau> \<cdot> t) \<in> par_rstep R"
+proof -
+  have "((\<sigma> \<cdot> t) |_ q, \<tau> \<cdot> (t |_ q)) \<in> par_rstep R" if "q \<in> var_poss t" for q
+  proof -
+    from that obtain x where q: "q \<in> poss t" "t |_ q = Var x" by (auto simp: var_poss_def)
+    then have "x \<in> vars t" by (auto simp: vars_poss)
+    then show ?thesis using assms q by (simp add: subt_at_subst_apply)
+  qed
+  moreover have "var_poss t \<subseteq> poss (\<sigma> \<cdot> t)" using var_poss_subset poss_subst_apply by blast
+  ultimately have "(\<sigma> \<cdot> t, (\<sigma> \<cdot> t)\<lbrakk>var_poss t \<Leftarrow> \<lambda>q. \<tau> \<cdot> (t |_ q)\<rbrakk>) \<in> par_rstep R"
+    using parallel_set_var_poss by (intro par_rstep_replace_at_set) auto
+  then show ?thesis by (simp add: replace_at_set_var_poss)
+qed
+
+text \<open>Parallel steps are closed under substitutions: the same positions of \<open>\<delta>(s)\<close> are
+  contracted.\<close>
+
+lemma par_rstep_at_subst:
+  assumes "par_rstep_at R P s t"
+  shows "par_rstep_at R P (\<delta> \<cdot> s) (\<delta> \<cdot> t)"
+proof -
+  from assms obtain c where P: "parallel_set P" "P \<subseteq> poss s"
+    and redex: "\<And>p. p \<in> P \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
+    and t: "t = s\<lbrakk>P \<Leftarrow> c\<rbrakk>"
+    unfolding par_rstep_at_def by blast
+  have "\<delta> \<cdot> t = (\<delta> \<cdot> s)\<lbrakk>P \<Leftarrow> \<lambda>p. \<delta> \<cdot> c p\<rbrakk>" using t P by (simp add: subst_replace_at_set)
+  moreover have "par_rstep_at R P (\<delta> \<cdot> s) ((\<delta> \<cdot> s)\<lbrakk>P \<Leftarrow> \<lambda>p. \<delta> \<cdot> c p\<rbrakk>)"
+  proof (rule par_rstep_atI)
+    show "P \<subseteq> poss (\<delta> \<cdot> s)" using P(2) poss_subst_apply by blast
+    fix p assume p: "p \<in> P"
+    then obtain l r \<sigma> where "(l, r) \<in> R" "s |_ p = \<sigma> \<cdot> l" "c p = \<sigma> \<cdot> r" using redex by blast
+    moreover have "(\<delta> \<cdot> s) |_ p = \<delta> \<cdot> (s |_ p)" using p P(2) by (auto simp: subt_at_subst_apply)
+    ultimately show "\<exists>l r \<sigma>. (l, r) \<in> R \<and> (\<delta> \<cdot> s) |_ p = \<sigma> \<cdot> l \<and> \<delta> \<cdot> c p = \<sigma> \<cdot> r"
+      by (intro exI[of _ l] exI[of _ r] exI[of _ "\<delta> \<circ>\<^sub>s \<sigma>"]) simp
+  qed (use P in simp)
+  ultimately show ?thesis by simp
+qed
+
+lemma par_rstep_subst_closed: "(s, t) \<in> par_rstep R \<Longrightarrow> (\<delta> \<cdot> s, \<delta> \<cdot> t) \<in> par_rstep R"
+  by (auto elim!: par_rstepE intro: par_rstepI par_rstep_at_subst)
+
+subsubsection \<open>Splitting a parallel step at outermost positions\<close>
+
+text \<open>If every redex position of \<open>s \<rightrightarrows>\<^sup>P t\<close> lies below some position of a parallel set \<open>Q\<close>, then
+  \<open>t = s[t|\<^sub>q]\<^sub>q\<^sub>\<in>\<^sub>Q\<close> and each \<open>s|\<^sub>q \<rightrightarrows> t|\<^sub>q\<close> contracts the redexes of \<open>P\<close> below \<open>q\<close>.\<close>
+
+lemma par_rstep_at_decompose:
+  assumes step: "par_rstep_at R P s t" and Q: "parallel_set Q" "Q \<subseteq> poss s"
+    and below: "\<And>p. p \<in> P \<Longrightarrow> \<exists>q \<in> Q. q \<le>\<^sub>p p"
+  shows "t = s\<lbrakk>Q \<Leftarrow> \<lambda>q. t |_ q\<rbrakk>"
+    and "\<And>q. q \<in> Q \<Longrightarrow> par_rstep_at R {p. q @ p \<in> P} (s |_ q) (t |_ q)"
+proof -
+  from step obtain c where P: "parallel_set P" "P \<subseteq> poss s"
+    and redex: "\<And>p. p \<in> P \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
+    and t: "t = s\<lbrakk>P \<Leftarrow> c\<rbrakk>"
+    unfolding par_rstep_at_def by blast
+  define Pq where "Pq q = {p. q @ p \<in> P}" for q
+  have PP: "P = {q @ p | q p. q \<in> Q \<and> p \<in> Pq q}"
+    using below unfolding Pq_def prefix_le_def by blast
+  have Pq1: "parallel_set (Pq q)" for q
+    unfolding Pq_def by (rule parallel_set_below[OF P(1)])
+  have Pq2: "Pq q \<subseteq> poss (s |_ q)" if "q \<in> Q" for q
+    using P(2) Q(2) that poss_subt_at unfolding Pq_def by blast
+  let ?u = "\<lambda>q. (s |_ q)\<lbrakk>Pq q \<Leftarrow> \<lambda>p. c (q @ p)\<rbrakk>"
+  have tu: "t = s\<lbrakk>Q \<Leftarrow> ?u\<rbrakk>"
+    using t replace_at_set_nested[OF Q Pq1 Pq2, of c] PP by simp
+  have tq: "t |_ q = ?u q" if "q \<in> Q" for q
+    using replace_at_set_subt_at[OF Q that, of ?u] tu by simp
+  have "s\<lbrakk>Q \<Leftarrow> ?u\<rbrakk> = s\<lbrakk>Q \<Leftarrow> \<lambda>q. t |_ q\<rbrakk>"
+    using Q tq by (intro replace_at_set_cong) auto
+  then show "t = s\<lbrakk>Q \<Leftarrow> \<lambda>q. t |_ q\<rbrakk>" using tu by simp
+  show "par_rstep_at R {p. q @ p \<in> P} (s |_ q) (t |_ q)" if q: "q \<in> Q" for q
+  proof -
+    have "par_rstep_at R (Pq q) (s |_ q) (?u q)"
+    proof (rule par_rstep_atI[OF Pq1 Pq2[OF q]])
+      fix p assume "p \<in> Pq q"
+      then have qp: "q @ p \<in> P" by (simp add: Pq_def)
+      with P(2) have "s |_ (q @ p) = s |_ q |_ p" by (intro subt_at_append) auto
+      then show "\<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ q |_ p = \<sigma> \<cdot> l \<and> c (q @ p) = \<sigma> \<cdot> r"
+        using redex[OF qp] by metis
+    qed
+    then show ?thesis using tq[OF q] by (simp add: Pq_def)
+  qed
+qed
+
+text \<open>A peak \<open>t\<^sub>0 \<leftleftarrows>\<^sup>P\<^sup>0 s \<rightrightarrows>\<^sup>P\<^sup>1 t\<^sub>1\<close> can be joined by joining, for each outermost position \<open>q\<close> of
+  \<open>P\<^sub>0 \<union> P\<^sub>1\<close>, the peak \<open>t\<^sub>0|\<^sub>q \<leftleftarrows> s|\<^sub>q \<rightrightarrows> t\<^sub>1|\<^sub>q\<close>; in each of these, one of the two steps is a
+  contraction at the root.\<close>
+
+lemma par_peak_outermost:
+  assumes step0: "par_rstep_at R P\<^sub>0 s t\<^sub>0" and step1: "par_rstep_at R P\<^sub>1 s t\<^sub>1"
+    and local: "\<And>q. q \<in> outermost (P\<^sub>0 \<union> P\<^sub>1) \<Longrightarrow>
+      \<exists>u. (t\<^sub>0 |_ q, u) \<in> par_rstep R \<and> (t\<^sub>1 |_ q, u) \<in> par_rstep R"
+  shows "\<exists>u. (t\<^sub>0, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R"
+proof -
+  let ?Q = "outermost (P\<^sub>0 \<union> P\<^sub>1)"
+  have Q: "parallel_set ?Q" "?Q \<subseteq> poss s"
+    using parallel_set_outermost outermost_subset step0 step1 unfolding par_rstep_at_def by blast+
+  have below: "\<exists>q \<in> ?Q. q \<le>\<^sub>p p" if "p \<in> P\<^sub>0 \<union> P\<^sub>1" for p using outermost_exists[OF that] .
+  obtain u where u: "\<And>q. q \<in> ?Q \<Longrightarrow> (t\<^sub>0 |_ q, u q) \<in> par_rstep R \<and> (t\<^sub>1 |_ q, u q) \<in> par_rstep R"
+    using local by metis
+  have join: "(t, s\<lbrakk>?Q \<Leftarrow> u\<rbrakk>) \<in> par_rstep R"
+    if teq: "t = s\<lbrakk>?Q \<Leftarrow> \<lambda>q. t |_ q\<rbrakk>" and tu: "\<And>q. q \<in> ?Q \<Longrightarrow> (t |_ q, u q) \<in> par_rstep R" for t
+  proof -
+    have "?Q \<subseteq> poss t" by (subst teq) (rule poss_replace_at_set_subset[OF Q])
+    then have "(t, t\<lbrakk>?Q \<Leftarrow> u\<rbrakk>) \<in> par_rstep R" using Q(1) tu by (intro par_rstep_replace_at_set)
+    moreover have "t\<lbrakk>?Q \<Leftarrow> u\<rbrakk> = s\<lbrakk>?Q \<Leftarrow> u\<rbrakk>" by (subst teq) (rule replace_at_set_overwrite[OF Q])
+    ultimately show ?thesis by simp
+  qed
+  have "(t\<^sub>0, s\<lbrakk>?Q \<Leftarrow> u\<rbrakk>) \<in> par_rstep R"
+    using par_rstep_at_decompose(1)[OF step0 Q] below u by (intro join) auto
+  moreover have "(t\<^sub>1, s\<lbrakk>?Q \<Leftarrow> u\<rbrakk>) \<in> par_rstep R"
+    using par_rstep_at_decompose(1)[OF step1 Q] below u by (intro join) auto
+  ultimately show ?thesis by blast
+qed
+
+lemma par_rstep_at_outermost:
+  assumes step0: "par_rstep_at R P\<^sub>0 s t\<^sub>0" and step1: "par_rstep_at R P\<^sub>1 s t\<^sub>1"
+    and q: "q \<in> outermost (P\<^sub>0 \<union> P\<^sub>1)"
+  shows "par_rstep_at R {p. q @ p \<in> P\<^sub>0} (s |_ q) (t\<^sub>0 |_ q)"
+    and "par_rstep_at R {p. q @ p \<in> P\<^sub>1} (s |_ q) (t\<^sub>1 |_ q)"
+proof -
+  let ?Q = "outermost (P\<^sub>0 \<union> P\<^sub>1)"
+  have Q: "parallel_set ?Q" "?Q \<subseteq> poss s"
+    using parallel_set_outermost outermost_subset step0 step1 unfolding par_rstep_at_def by blast+
+  have below: "\<exists>q \<in> ?Q. q \<le>\<^sub>p p" if "p \<in> P\<^sub>0 \<union> P\<^sub>1" for p using outermost_exists[OF that] .
+  show "par_rstep_at R {p. q @ p \<in> P\<^sub>0} (s |_ q) (t\<^sub>0 |_ q)"
+    using par_rstep_at_decompose(2)[OF step0 Q _ q] below by blast
+  show "par_rstep_at R {p. q @ p \<in> P\<^sub>1} (s |_ q) (t\<^sub>1 |_ q)"
+    using par_rstep_at_decompose(2)[OF step1 Q _ q] below by blast
+qed
+
+text \<open>Lemma 6.4.4 (Parallel Moves Lemma). If \<open>l\<close> is linear and no redex of the parallel step
+  \<open>\<sigma>(l) \<rightrightarrows>\<^sup>P t\<close> lies at a non-variable position of \<open>l\<close>, then the step takes place inside the
+  substitution: \<open>t = \<tau>(l)\<close> with \<open>\<sigma>(x) \<rightrightarrows> \<tau>(x)\<close> for all \<open>x \<in> Var(l)\<close>.\<close>
+
+lemma linear_var_pos_unique:
+  assumes "linear_term t" and "p \<in> poss t" and "q \<in> poss t"
+    and "t |_ p = Var x" and "t |_ q = Var x"
+  shows "p = q"
+  using assms
+proof (induct t arbitrary: p q)
+  case (Fun f ts)
+  then obtain i p' j q' where p: "p = i # p'" "i < length ts" "p' \<in> poss (ts ! i)" "ts ! i |_ p' = Var x"
+    and q: "q = j # q'" "j < length ts" "q' \<in> poss (ts ! j)" "ts ! j |_ q' = Var x"
+    by (cases p; cases q) auto
+  have "x \<in> vars (ts ! i)" "x \<in> vars (ts ! j)" using p q by (auto simp: vars_poss)
+  then have "i = j" using Fun.prems(1) p(2) q(2) by auto
+  then show ?case using Fun.hyps[OF nth_mem[OF p(2)]] Fun.prems(1) p q by auto
 qed simp
 
-text \<open>Substitutions defined on pairwise variable-disjoint terms can be merged.\<close>
-
-lemma merge_substs:
-  assumes "\<And>i j. i < n \<Longrightarrow> j < n \<Longrightarrow> i \<noteq> j \<Longrightarrow> V i \<inter> V j = {}"
-  shows "\<exists>\<tau>. \<forall>i < n. \<forall>x \<in> V i. \<tau> x = \<tau>s i x"
+lemma par_rstep_at_linear:
+  assumes lin: "linear_term l" and step: "par_rstep_at R P (\<sigma> \<cdot> l) t"
+    and var: "\<And>p. p \<in> P \<Longrightarrow> p \<in> poss l \<Longrightarrow> \<exists>x. l |_ p = Var x"
+  shows "\<exists>\<tau>. t = \<tau> \<cdot> l \<and> (\<forall>x \<in> vars l. (\<sigma> x, \<tau> x) \<in> par_rstep R)"
 proof -
-  define \<tau> where "\<tau> x = \<tau>s (SOME i. i < n \<and> x \<in> V i) x" for x
-  have "\<tau> x = \<tau>s i x" if "i < n" "x \<in> V i" for i x
+  let ?Q = "var_poss l"
+  have Q: "parallel_set ?Q" "?Q \<subseteq> poss (\<sigma> \<cdot> l)"
+    using parallel_set_var_poss var_poss_subset poss_subst_apply by blast+
+  have below: "\<exists>q \<in> ?Q. q \<le>\<^sub>p p" if p: "p \<in> P" for p
   proof -
-    have "(SOME i. i < n \<and> x \<in> V i) = i"
-      using that assms by (intro some_equality) blast+
-    then show ?thesis by (simp add: \<tau>_def)
+    have "p \<in> poss (\<sigma> \<cdot> l)" using step p unfolding par_rstep_at_def by blast
+    from poss_subst_apply_var_poss[OF this] show ?thesis
+    proof
+      assume "p \<in> poss l"
+      then have "p \<in> ?Q" using var[OF p] by (auto simp: var_poss_def)
+      then show ?thesis using prefix_le_refl by blast
+    qed
   qed
-  then show ?thesis by blast
+  have dec1: "t = (\<sigma> \<cdot> l)\<lbrakk>?Q \<Leftarrow> \<lambda>q. t |_ q\<rbrakk>"
+    using par_rstep_at_decompose(1)[OF step Q] below by blast
+  have dec2: "par_rstep_at R {p. q @ p \<in> P} ((\<sigma> \<cdot> l) |_ q) (t |_ q)" if "q \<in> ?Q" for q
+    using par_rstep_at_decompose(2)[OF step Q _ that] below by blast
+  define \<tau> where "\<tau> x = (if x \<in> vars l then t |_ (THE q. q \<in> poss l \<and> l |_ q = Var x) else \<sigma> x)" for x
+  have \<tau>q: "\<tau> x = t |_ q" if "q \<in> ?Q" and "l |_ q = Var x" for q x
+  proof -
+    have q: "q \<in> poss l" using that by (simp add: var_poss_def)
+    then have "x \<in> vars l" using that by (auto simp: vars_poss)
+    moreover have "(THE q. q \<in> poss l \<and> l |_ q = Var x) = q"
+      using q that(2) linear_var_pos_unique[OF lin] by (intro the_equality) auto
+    ultimately show ?thesis by (simp add: \<tau>_def)
+  qed
+  have "t = (\<sigma> \<cdot> l)\<lbrakk>?Q \<Leftarrow> \<lambda>q. t |_ q\<rbrakk>" by (rule dec1)
+  also have "\<dots> = (\<sigma> \<cdot> l)\<lbrakk>?Q \<Leftarrow> \<lambda>q. \<tau> \<cdot> (l |_ q)\<rbrakk>"
+  proof (rule replace_at_set_cong[OF Q])
+    fix q assume q: "q \<in> ?Q"
+    then obtain x where "l |_ q = Var x" by (auto simp: var_poss_def)
+    then show "t |_ q = \<tau> \<cdot> (l |_ q)" using \<tau>q[OF q] by simp
+  qed
+  also have "\<dots> = \<tau> \<cdot> l" by (rule replace_at_set_var_poss)
+  finally have "t = \<tau> \<cdot> l" .
+  moreover have "(\<sigma> x, \<tau> x) \<in> par_rstep R" if "x \<in> vars l" for x
+  proof -
+    from that[unfolded vars_poss] obtain q where q: "q \<in> poss l" "l |_ q = Var x" by blast
+    then have Qq: "q \<in> ?Q" by (auto simp: var_poss_def)
+    have "(\<sigma> \<cdot> l) |_ q = \<sigma> x" using q by (simp add: subt_at_subst_apply)
+    then show ?thesis using dec2[OF Qq] \<tau>q[OF Qq q(2)] by (auto intro: par_rstepI)
+  qed
+  ultimately show ?thesis by blast
 qed
 
 context TRS_inf
@@ -1161,139 +1947,81 @@ proof -
   then show ?thesis by simp
 qed
 
-text \<open>The key lemma for orthogonal systems: in a left-linear system without critical pairs,
-  a parallel step from an instance \<open>\<sigma>(u)\<close> of a proper subterm \<open>u\<close> of a left-hand side
-  takes place entirely inside the substitution.\<close>
+text \<open>A peak in which one of the two steps contracts a redex at the root. If the other step
+  also contracts a redex at the root, both results coincide by Lemma 6.3.9. Otherwise, as there
+  are no critical pairs, no redex of the other step lies at a non-variable position of the
+  left-hand side, and Lemma 6.4.4 applies.\<close>
 
-lemma par_rstep_below_lhs:
-  assumes orth: "orthogonal R" and R: "(l, r) \<in> R"
-  shows "p \<in> poss l \<Longrightarrow> p \<noteq> [] \<Longrightarrow> l |_ p = u \<Longrightarrow> (\<sigma> \<cdot> u, t) \<in> par_rstep R \<Longrightarrow>
-    \<exists>\<tau>. t = \<tau> \<cdot> u \<and> (\<forall>x \<in> vars u. (\<sigma> x, \<tau> x) \<in> par_rstep R)"
-proof (induct u arbitrary: p t)
-  case (Var x)
-  then show ?case by (intro exI[of _ "\<lambda>_. t"]) auto
-next
-  case (Fun f us)
-  have lin: "linear_term (Fun f us)"
-    using orth R linear_term_subt_at[OF _ Fun.prems(1)] Fun.prems(3)
-    unfolding orthogonal_def left_linear_def by auto
-  from Fun.prems(4) show ?case
-  proof cases
-    case (args ss ts g)
-    then have len: "length ts = length us" and ss: "ss = map ((\<cdot>) \<sigma>) us" and g: "g = f" by auto
-    have "\<exists>\<tau>. ts ! i = \<tau> \<cdot> us ! i \<and> (\<forall>x \<in> vars (us ! i). (\<sigma> x, \<tau> x) \<in> par_rstep R)"
-      if i: "i < length us" for i
-    proof -
-      have pi: "p @ [i] \<in> poss l"
-        using poss_subt_at[OF Fun.prems(1), of "[i]"] Fun.prems(3) i by simp
-      moreover have "l |_ (p @ [i]) = us ! i"
-        using subt_at_append[OF pi] Fun.prems(3) by simp
-      moreover have "(\<sigma> \<cdot> us ! i, ts ! i) \<in> par_rstep R" using args(4) i len ss by auto
-      ultimately show ?thesis using Fun.hyps[OF nth_mem[OF i]] by blast
-    qed
-    then obtain \<tau>s where \<tau>s: "\<And>i. i < length us \<Longrightarrow>
-        ts ! i = \<tau>s i \<cdot> us ! i \<and> (\<forall>x \<in> vars (us ! i). (\<sigma> x, \<tau>s i x) \<in> par_rstep R)"
-      by metis
-    obtain \<tau> where \<tau>: "\<And>i x. i < length us \<Longrightarrow> x \<in> vars (us ! i) \<Longrightarrow> \<tau> x = \<tau>s i x"
-      using merge_substs[of "length us" "\<lambda>i. vars (us ! i)" \<tau>s] lin by auto
-    have "ts ! i = \<tau> \<cdot> us ! i" if "i < length us" for i
-      using \<tau>s[OF that] \<tau>[OF that] by (auto intro: subst_apply_cong)
-    then have "t = \<tau> \<cdot> Fun f us" using args(2) len g by (auto intro: nth_equalityI)
-    moreover have "\<forall>x \<in> vars (Fun f us). (\<sigma> x, \<tau> x) \<in> par_rstep R"
-      using \<tau>s \<tau> by (auto simp: in_set_conv_nth)
-    ultimately show ?thesis by blast
+lemma orthogonal_root_peak:
+  assumes orth: "orthogonal R" and step0: "par_rstep_at R P\<^sub>0 s t\<^sub>0"
+    and step1: "par_rstep_at R P\<^sub>1 s t\<^sub>1" and root: "[] \<in> P\<^sub>0"
+  shows "\<exists>u. (t\<^sub>0, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R"
+proof -
+  from step0 obtain c where P0: "parallel_set P\<^sub>0"
+    and redex0: "\<And>p. p \<in> P\<^sub>0 \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
+    and t0: "t\<^sub>0 = s\<lbrakk>P\<^sub>0 \<Leftarrow> c\<rbrakk>"
+    unfolding par_rstep_at_def by blast
+  from step1 obtain c' where P1: "parallel_set P\<^sub>1"
+    and redex1: "\<And>p. p \<in> P\<^sub>1 \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c' p = \<sigma> \<cdot> r"
+    and t1: "t\<^sub>1 = s\<lbrakk>P\<^sub>1 \<Leftarrow> c'\<rbrakk>"
+    unfolding par_rstep_at_def by blast
+  obtain l r \<sigma> where R: "(l, r) \<in> R" and seq: "s = \<sigma> \<cdot> l" and c: "c [] = \<sigma> \<cdot> r"
+    using redex0[OF root] by auto
+  have t0': "t\<^sub>0 = \<sigma> \<cdot> r" using t0 c parallel_set_Nil[OF P0 root] by (simp add: replace_at_set_singleton)
+  show ?thesis
+  proof (cases "[] \<in> P\<^sub>1")
+    case True
+    obtain l' r' \<sigma>' where R': "(l', r') \<in> R" and s': "s = \<sigma>' \<cdot> l'" and c': "c' [] = \<sigma>' \<cdot> r'"
+      using redex1[OF True] by auto
+    have "t\<^sub>1 = \<sigma>' \<cdot> r'" using t1 c' parallel_set_Nil[OF P1 True] by (simp add: replace_at_set_singleton)
+    also have "\<dots> = \<sigma> \<cdot> r"
+      using root_overlap[of l' r' l r \<sigma>' \<sigma>] R R' s' seq orth by (simp add: orthogonal_def)
+    finally show ?thesis using t0' by (intro exI[of _ "\<sigma> \<cdot> r"]) simp
   next
-    case (rule l' r' \<sigma>')
-    have "\<sigma> \<cdot> (l |_ p) = \<sigma>' \<cdot> l'" using rule Fun.prems(3) by simp
-    from overlap_imp_CP[OF infinite_vars R rule(3) Fun.prems(1) _ this] Fun.prems(2,3)
-    have "CP R \<noteq> {}" by auto
-    then show ?thesis using orth by (simp add: orthogonal_def)
-  qed simp
+    case False
+    have var: "\<exists>x. l |_ p = Var x" if p: "p \<in> P\<^sub>1" "p \<in> poss l" for p
+    proof (rule ccontr)
+      assume nv: "\<nexists>x. l |_ p = Var x"
+      obtain l' r' \<sigma>' where R': "(l', r') \<in> R" and "s |_ p = \<sigma>' \<cdot> l'" using redex1[OF p(1)] by blast
+      then have "\<sigma> \<cdot> (l |_ p) = \<sigma>' \<cdot> l'" using seq p(2) by (simp add: subt_at_subst_apply)
+      from overlap_imp_CP[OF infinite_vars R R' p(2) _ this] nv False p(1)
+      have "CP R \<noteq> {}" by auto
+      then show False using orth by (simp add: orthogonal_def)
+    qed
+    have lin: "linear_term l" using orth R unfolding orthogonal_def left_linear_def by auto
+    obtain \<tau> where t1': "t\<^sub>1 = \<tau> \<cdot> l" and \<sigma>\<tau>: "\<forall>x \<in> vars l. (\<sigma> x, \<tau> x) \<in> par_rstep R"
+      using par_rstep_at_linear[OF lin step1[unfolded seq] var] by blast
+    have "(t\<^sub>0, \<tau> \<cdot> r) \<in> par_rstep R"
+      unfolding t0' using rule_vars[OF R] \<sigma>\<tau> by (intro par_rstep_subst) auto
+    moreover have "(t\<^sub>1, \<tau> \<cdot> r) \<in> par_rstep R" unfolding t1' using R by (rule par_rstep_rule)
+    ultimately show ?thesis by blast
+  qed
 qed
 
-text \<open>A root redex against an arbitrary parallel step.\<close>
-
-lemma par_rstep_root_peak:
-  assumes orth: "orthogonal R" and R: "(l, r) \<in> R" and st: "(\<sigma> \<cdot> l, t) \<in> par_rstep R"
-  shows "\<exists>u. (\<sigma> \<cdot> r, u) \<in> par_rstep R \<and> (t, u) \<in> par_rstep R"
-  using st
-proof cases
-  case (var x)
-  then show ?thesis using rule_lhs_not_Var[OF R] by (cases l) auto
-next
-  case (args ss ts f)
-  obtain ls where l: "l = Fun f ls" and ss: "ss = map ((\<cdot>) \<sigma>) ls"
-    using args(1) rule_lhs_not_Var[OF R] by (cases l) auto
-  have lin: "linear_term l" using orth R unfolding orthogonal_def left_linear_def by auto
-  have "\<exists>\<tau>. ts ! i = \<tau> \<cdot> ls ! i \<and> (\<forall>x \<in> vars (ls ! i). (\<sigma> x, \<tau> x) \<in> par_rstep R)"
-    if i: "i < length ls" for i
-    using par_rstep_below_lhs[OF orth R, of "[i]" "ls ! i" \<sigma> "ts ! i"] args i l ss by auto
-  then obtain \<tau>s where \<tau>s: "\<And>i. i < length ls \<Longrightarrow>
-      ts ! i = \<tau>s i \<cdot> ls ! i \<and> (\<forall>x \<in> vars (ls ! i). (\<sigma> x, \<tau>s i x) \<in> par_rstep R)"
-    by metis
-  obtain \<tau> where \<tau>: "\<And>i x. i < length ls \<Longrightarrow> x \<in> vars (ls ! i) \<Longrightarrow> \<tau> x = \<tau>s i x"
-    using merge_substs[of "length ls" "\<lambda>i. vars (ls ! i)" \<tau>s] lin l by auto
-  have "ts ! i = \<tau> \<cdot> ls ! i" if "i < length ls" for i
-    using \<tau>s[OF that] \<tau>[OF that] by (auto intro: subst_apply_cong)
-  then have t: "t = \<tau> \<cdot> l" using args l ss by (auto intro: nth_equalityI)
-  have \<sigma>\<tau>: "(\<sigma> x, \<tau> x) \<in> par_rstep R" if "x \<in> vars l" for x
-    using that \<tau>s \<tau> l by (auto simp: in_set_conv_nth)
-  have "(\<sigma> \<cdot> r, \<tau> \<cdot> r) \<in> par_rstep R"
-    using rule_vars[OF R] \<sigma>\<tau> by (intro par_rstep_subst) auto
-  moreover have "(t, \<tau> \<cdot> r) \<in> par_rstep R" unfolding t using R by (rule par_rstep.rule)
-  ultimately show ?thesis by blast
-next
-  case (rule l' r' \<sigma>')
-  then have "\<sigma> \<cdot> r = \<sigma>' \<cdot> r'"
-    using root_overlap[OF _ R rule(3)] orth by (auto simp: orthogonal_def)
-  then show ?thesis using rule(2) by (intro exI[of _ t]) simp
-qed
-
-text \<open>Theorem 6.3.10: in an orthogonal TRS, parallel reduction has the diamond property.\<close>
+text \<open>Theorem 6.3.10: in an orthogonal TRS, parallel reduction has the diamond property. Given
+  \<open>t\<^sub>0 \<leftleftarrows>\<^sup>P\<^sup>0 s \<rightrightarrows>\<^sup>P\<^sup>1 t\<^sub>1\<close>, we join the peaks below the outermost positions of \<open>P\<^sub>0 \<union> P\<^sub>1\<close>.\<close>
 
 theorem orthogonal_par_rstep_diamond:
   assumes orth: "orthogonal R"
   shows "\<diamond> (par_rstep R)"
   unfolding diamond_def
 proof (intro allI impI, elim conjE)
-  fix s t\<^sub>1 t\<^sub>2 assume "(s, t\<^sub>1) \<in> par_rstep R" and "(s, t\<^sub>2) \<in> par_rstep R"
-  then show "\<exists>u. (t\<^sub>1, u) \<in> par_rstep R \<and> (t\<^sub>2, u) \<in> par_rstep R"
-  proof (induct arbitrary: t\<^sub>2 rule: par_rstep.induct)
-    case (var x)
-    from var show ?case
-    proof cases
-      case var
-      then show ?thesis by (intro exI[of _ t\<^sub>2]) simp
+  fix s t\<^sub>0 t\<^sub>1 assume "(s, t\<^sub>0) \<in> par_rstep R" and "(s, t\<^sub>1) \<in> par_rstep R"
+  then obtain P\<^sub>0 P\<^sub>1 where step0: "par_rstep_at R P\<^sub>0 s t\<^sub>0" and step1: "par_rstep_at R P\<^sub>1 s t\<^sub>1"
+    by (auto elim!: par_rstepE)
+  show "\<exists>u. (t\<^sub>0, u) \<in> par_rstep R \<and> (t\<^sub>1, u) \<in> par_rstep R"
+  proof (rule par_peak_outermost[OF step0 step1])
+    fix q assume q: "q \<in> outermost (P\<^sub>0 \<union> P\<^sub>1)"
+    note local = par_rstep_at_outermost[OF step0 step1 q]
+    have "q \<in> P\<^sub>0 \<or> q \<in> P\<^sub>1" using q outermost_subset by blast
+    then show "\<exists>u. (t\<^sub>0 |_ q, u) \<in> par_rstep R \<and> (t\<^sub>1 |_ q, u) \<in> par_rstep R"
+    proof
+      assume "q \<in> P\<^sub>0"
+      then show ?thesis using orthogonal_root_peak[OF orth local] by simp
     next
-      case (rule l r \<sigma>)
-      then show ?thesis using rule_lhs_not_Var by (cases l) auto
+      assume "q \<in> P\<^sub>1"
+      then show ?thesis using orthogonal_root_peak[OF orth local(2) local(1)] by auto
     qed
-  next
-    case (args ss ts f)
-    note len = args(1) and steps = args(2) and IH = args(3)
-    from args(4) show ?case
-    proof cases
-      case (args ts')
-      then have t2: "t\<^sub>2 = Fun f ts'" and len': "length ss = length ts'"
-        and steps': "\<And>i. i < length ts' \<Longrightarrow> (ss ! i, ts' ! i) \<in> par_rstep R" by auto
-      have "\<exists>u. (ts ! i, u) \<in> par_rstep R \<and> (ts' ! i, u) \<in> par_rstep R" if "i < length ts" for i
-        using IH[OF that steps'] that len len' by auto
-      then obtain us where us: "\<And>i. i < length ts \<Longrightarrow>
-          (ts ! i, us i) \<in> par_rstep R \<and> (ts' ! i, us i) \<in> par_rstep R" by metis
-      have "(Fun f ts, Fun f (map us [0..<length ts])) \<in> par_rstep R"
-        using us by (auto intro!: par_rstep.args)
-      moreover have "(Fun f ts', Fun f (map us [0..<length ts])) \<in> par_rstep R"
-        using us len len' by (auto intro!: par_rstep.args)
-      ultimately show ?thesis using t2 by blast
-    next
-      case (rule l r \<sigma>)
-      have "(\<sigma> \<cdot> l, Fun f ts) \<in> par_rstep R"
-        using rule(1) len steps by (metis par_rstep.args)
-      from par_rstep_root_peak[OF orth rule(3) this] show ?thesis using rule(2) by blast
-    qed
-  next
-    case (rule l r \<sigma>)
-    from par_rstep_root_peak[OF orth rule(1) rule(2)] show ?case by blast
   qed
 qed
 

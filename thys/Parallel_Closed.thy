@@ -205,11 +205,11 @@ lemma parallel_closed_root_peak:
 proof -
   from step0 obtain c where P0: "parallel_set P\<^sub>0"
     and redex0: "\<And>p. p \<in> P\<^sub>0 \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
-    and t0: "t\<^sub>0 = s\<lbrakk>P\<^sub>0 \<Leftarrow> c\<rbrakk>"
+    and t0: "t\<^sub>0 = s\<lbrakk>p \<in> P\<^sub>0 \<leftarrow> c p\<rbrakk>"
     unfolding par_rstep_at_def by blast
   from step1 obtain c' where P1: "parallel_set P\<^sub>1" "P\<^sub>1 \<subseteq> poss s"
     and redex1: "\<And>p. p \<in> P\<^sub>1 \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c' p = \<sigma> \<cdot> r"
-    and t1: "t\<^sub>1 = s\<lbrakk>P\<^sub>1 \<Leftarrow> c'\<rbrakk>"
+    and t1: "t\<^sub>1 = s\<lbrakk>p \<in> P\<^sub>1 \<leftarrow> c' p\<rbrakk>"
     unfolding par_rstep_at_def by blast
   have P0': "P\<^sub>0 = {[]}" using parallel_set_Nil[OF P0 root] .
   obtain l r \<sigma> where R: "(l, r) \<in> R" and seq: "s = \<sigma> \<cdot> l" and c: "c [] = \<sigma> \<cdot> r"
@@ -262,16 +262,16 @@ proof -
         using parallel_set_subset[OF P1(1)] P1(2) par qs by (auto intro: parallel_poss_replace_at)
       have sub: "?s' |_ p = s |_ p" if "p \<in> ?P1" for p
         using par[OF that] qs P1(2) that by (intro parallel_subt_at_replace_at) auto
-      have "t\<^sub>1 = ?s'\<lbrakk>?P1 \<Leftarrow> c'\<rbrakk>"
+      have "t\<^sub>1 = ?s'\<lbrakk>p \<in> ?P1 \<leftarrow> c' p\<rbrakk>"
       proof -
-        have "?s'\<lbrakk>?P1 \<Leftarrow> c'\<rbrakk> = replace_par ?s' ?P1 c'"
+        have "?s'\<lbrakk>p \<in> ?P1 \<leftarrow> c' p\<rbrakk> = replace_par ?s' ?P1 c'"
           using P1' by (rule replace_at_set_replace_par)
         also have "\<dots> = replace_par s (insert q ?P1) c'"
           using qs par by (intro replace_par_insert) auto
         also have "insert q ?P1 = P\<^sub>1" using q(1) by blast
         finally show ?thesis using t1 P1 by (simp add: replace_at_set_replace_par)
       qed
-      moreover have "par_rstep_at R ?P1 ?s' (?s'\<lbrakk>?P1 \<Leftarrow> c'\<rbrakk>)"
+      moreover have "par_rstep_at R ?P1 ?s' (?s'\<lbrakk>p \<in> ?P1 \<leftarrow> c' p\<rbrakk>)"
         using P1' sub redex1 by (intro par_rstep_atI) auto
       ultimately have step1': "par_rstep_at R ?P1 ?s' t\<^sub>1" by simp
       have "overlap_size ?s' ?P1 P' \<le> (\<Sum>p \<in> ?P1. term_size (?s' |_ p))"

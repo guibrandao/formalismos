@@ -120,7 +120,7 @@ fun subt_at :: "('f, 'v) term \<Rightarrow> pos \<Rightarrow> ('f, 'v) term" (in
 text \<open>Definition 3.1.3(4): \<open>s[t]\<^sub>p\<close> replaces the subterm of \<open>s\<close> at position \<open>p\<close> by \<open>t\<close>.\<close>
 
 fun replace_at :: "('f, 'v) term \<Rightarrow> pos \<Rightarrow> ('f, 'v) term \<Rightarrow> ('f, 'v) term"
-  (\<open>_\<lbrakk>_ \<leftarrow> _\<rbrakk>\<close> [1000, 0, 0] 1000) where
+  (\<open>_\<lbrakk>_ \<leftarrow> _\<rbrakk>\<close> [1000, 51, 0] 1000) where
   "s\<lbrakk>[] \<leftarrow> t\<rbrakk> = t"
 | "(Fun f ss)\<lbrakk>i # p \<leftarrow> t\<rbrakk> = Fun f (ss[i := (ss ! i)\<lbrakk>p \<leftarrow> t\<rbrakk>])"
 | "(Var x)\<lbrakk>i # p \<leftarrow> t\<rbrakk> = Var x" \<comment> \<open>junk\<close>

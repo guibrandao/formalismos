@@ -1229,20 +1229,6 @@ next
     using Cons.prems(3) Cons.hyps[of "{p. i # p \<in> P}" "ss ! i"] s i by (simp add: replace_par_Fun)
 qed
 
-lemma replace_par_subt_at_parallel:
-  assumes "q \<in> poss s" and "\<forall>p \<in> P. q \<parallel> p"
-  shows "replace_par s P c |_ q = s |_ q"
-  using assms
-proof (induct q arbitrary: s P c)
-  case (Cons i q)
-  then obtain f ss where s: "s = Fun f ss" and i: "i < length ss" and q: "q \<in> poss (ss ! i)"
-    by (cases s) auto
-  have "[] \<notin> P" using Cons.prems(2) by auto
-  moreover have "\<forall>p \<in> {p. i # p \<in> P}. q \<parallel> p" using Cons.prems(2) by auto
-  ultimately show ?case
-    using Cons.hyps[OF q, of "{p. i # p \<in> P}"] s i by (simp add: replace_par_Fun)
-qed simp
-
 lemma replace_par_poss:
   assumes "q \<in> poss s" and "\<forall>p \<in> P. \<not> p <\<^sub>p q"
   shows "q \<in> poss (replace_par s P c)"
@@ -1514,7 +1500,7 @@ lemma replace_at_set_cong:
 
 lemma replace_at_set_subt_at:
   assumes "parallel_set P" and "P \<subseteq> poss s" and "q \<in> P"
-  shows "s\<lbrakk>p \<in> P \<leftarrow> c p\<rbrakk> |_ q = c q"
+  shows "s\<lbrakk>p \<in> P \<leftarrow> t p\<rbrakk> |_ q = t q"
   using assms replace_par_subt_at by (simp add: replace_at_set_replace_par)
 
 lemma poss_replace_at_set:
@@ -1524,7 +1510,7 @@ lemma poss_replace_at_set:
 
 lemma poss_replace_at_set_subset:
   assumes "parallel_set P" and "P \<subseteq> poss s"
-  shows "P \<subseteq> poss (s\<lbrakk>p \<in> P \<leftarrow> c p\<rbrakk>)"
+  shows "P \<subseteq> poss (s\<lbrakk>p \<in> P \<leftarrow> t p\<rbrakk>)"
   using assms poss_replace_at_set parallel_not_less by blast
 
 lemma replace_at_set_overwrite:
@@ -1540,9 +1526,9 @@ lemma replace_at_set_id:
 
 lemma subst_replace_at_set:
   assumes "parallel_set P" and "P \<subseteq> poss s"
-  shows "\<delta> \<cdot> s\<lbrakk>p \<in> P \<leftarrow> c p\<rbrakk> = (\<delta> \<cdot> s)\<lbrakk>p \<in> P \<leftarrow> \<delta> \<cdot> c p\<rbrakk>"
+  shows "\<sigma> \<cdot> s\<lbrakk>p \<in> P \<leftarrow> t p\<rbrakk> = (\<sigma> \<cdot> s)\<lbrakk>p \<in> P \<leftarrow> \<sigma> \<cdot> t p\<rbrakk>"
 proof -
-  have "P \<subseteq> poss (\<delta> \<cdot> s)" using assms(2) poss_subst_apply by blast
+  have "P \<subseteq> poss (\<sigma> \<cdot> s)" using assms(2) poss_subst_apply by blast
   then show ?thesis using assms replace_par_subst by (simp add: replace_at_set_replace_par)
 qed
 
@@ -1573,12 +1559,6 @@ lemma par_rstep_atI:
   assumes "parallel_set P" and "P \<subseteq> poss s"
     and "\<And>p. p \<in> P \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r"
   shows "par_rstep_at R P s (s\<lbrakk>p \<in> P \<leftarrow> c p\<rbrakk>)"
-  using assms unfolding par_rstep_at_def by blast
-
-lemma par_rstep_atE:
-  assumes "par_rstep_at R P s t"
-  obtains c where "parallel_set P" and "P \<subseteq> poss s"
-    and "\<And>p. p \<in> P \<Longrightarrow> \<exists>l r \<sigma>. (l, r) \<in> R \<and> s |_ p = \<sigma> \<cdot> l \<and> c p = \<sigma> \<cdot> r" and "t = s\<lbrakk>p \<in> P \<leftarrow> c p\<rbrakk>"
   using assms unfolding par_rstep_at_def by blast
 
 lemma par_rstepI: "par_rstep_at R P s t \<Longrightarrow> (s, t) \<in> par_rstep R"
@@ -1725,38 +1705,24 @@ proof -
   then show ?thesis using replace_at_set_overwrite[OF assms(1,2)] by simp
 qed
 
-text \<open>The special case \<open>P = {p}\<close>: \<open>\<rightrightarrows>\<close> is closed under contexts.\<close>
-
-lemma par_rstep_ctxt:
-  assumes "(u, v) \<in> par_rstep R" and "p \<in> poss s"
-  shows "(s\<lbrakk>p \<leftarrow> u\<rbrakk>, s\<lbrakk>p \<leftarrow> v\<rbrakk>) \<in> par_rstep R"
-proof -
-  have p: "p \<in> poss (s\<lbrakk>p \<leftarrow> u\<rbrakk>)" using poss_replace_at[OF assms(2), of "[]"] by simp
-  have "s\<lbrakk>p \<leftarrow> u\<rbrakk> |_ p = u" using subt_at_replace_at_append[OF assms(2), of "[]"] by simp
-  then have "(s\<lbrakk>p \<leftarrow> u\<rbrakk>, s\<lbrakk>p \<leftarrow> u\<rbrakk>\<lbrakk>q \<in> {p} \<leftarrow> v\<rbrakk>) \<in> par_rstep R"
-    using assms(1) p by (intro par_rstep_replace_at_set) auto
-  moreover have "s\<lbrakk>p \<leftarrow> u\<rbrakk>\<lbrakk>q \<in> {p} \<leftarrow> v\<rbrakk> = s\<lbrakk>p \<leftarrow> v\<rbrakk>"
-    using p replace_at_replace_at_append[OF assms(2), of "[]"] by (simp add: replace_at_set_singleton)
-  ultimately show ?thesis by simp
-qed
-
-text \<open>Lemma 6.4.2: if \<open>\<sigma>(x) \<rightrightarrows> \<tau>(x)\<close> for all \<open>x \<in> Var(t)\<close>, then \<open>\<sigma>(t) \<rightrightarrows> \<tau>(t)\<close>: contract, at each
-  variable position of \<open>t\<close>, the parallel step \<open>\<sigma>(x) \<rightrightarrows> \<tau>(x)\<close>.\<close>
+text \<open>Lemma 6.4.2: if \<open>\<sigma>(x) \<rightrightarrows> \<tau>(x)\<close> for all \<open>x \<in> Var(t)\<close>, then \<open>\<sigma>(t) \<rightrightarrows> \<tau>(t)\<close>. With \<open>Q\<close> the
+  variable positions of \<open>t\<close>, \<open>\<sigma>(t) = \<sigma>(t)[\<sigma>(t|\<^sub>q)]\<^sub>q\<^sub>\<in>\<^sub>Q \<rightrightarrows> \<sigma>(t)[\<tau>(t|\<^sub>q)]\<^sub>q\<^sub>\<in>\<^sub>Q = \<tau>(t)\<close> by Lemma 6.4.1.\<close>
 
 lemma par_rstep_subst:
   assumes "\<And>x. x \<in> vars t \<Longrightarrow> (\<sigma> x, \<tau> x) \<in> par_rstep R"
   shows "(\<sigma> \<cdot> t, \<tau> \<cdot> t) \<in> par_rstep R"
 proof -
+  have Q: "parallel_set (var_poss t)" "var_poss t \<subseteq> poss (\<sigma> \<cdot> t)"
+    using parallel_set_var_poss var_poss_subset poss_subst_apply by blast+
   have "((\<sigma> \<cdot> t) |_ q, \<tau> \<cdot> (t |_ q)) \<in> par_rstep R" if "q \<in> var_poss t" for q
   proof -
     from that obtain x where q: "q \<in> poss t" "t |_ q = Var x" by (auto simp: var_poss_def)
     then have "x \<in> vars t" by (auto simp: vars_poss)
     then show ?thesis using assms q by (simp add: subt_at_subst_apply)
   qed
-  moreover have "var_poss t \<subseteq> poss (\<sigma> \<cdot> t)" using var_poss_subset poss_subst_apply by blast
-  ultimately have "(\<sigma> \<cdot> t, (\<sigma> \<cdot> t)\<lbrakk>q \<in> var_poss t \<leftarrow> \<tau> \<cdot> (t |_ q)\<rbrakk>) \<in> par_rstep R"
-    using parallel_set_var_poss by (intro par_rstep_replace_at_set) auto
-  then show ?thesis by (simp add: replace_at_set_var_poss)
+  then have "((\<sigma> \<cdot> t)\<lbrakk>q \<in> var_poss t \<leftarrow> (\<sigma> \<cdot> t) |_ q\<rbrakk>, (\<sigma> \<cdot> t)\<lbrakk>q \<in> var_poss t \<leftarrow> \<tau> \<cdot> (t |_ q)\<rbrakk>) \<in> par_rstep R"
+    using Q by (intro par_rstep_parallel_ctxt)
+  then show ?thesis by (simp add: replace_at_set_id[OF Q] replace_at_set_var_poss)
 qed
 
 text \<open>Parallel steps are closed under substitutions: the same positions of \<open>\<delta>(s)\<close> are

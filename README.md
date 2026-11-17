@@ -7,8 +7,9 @@ Formalização em Isabelle/HOL de resultados do livro *Term Rewriting and All Th
 | Livro | Resultado | Nome na formalização |
 |---|---|---|
 | Fato 6.3.8 | `→ ⊆ ⇉ ⊆ →*` | `rstep_subset_par_rstep`, `par_rstep_subset_rtrancl` |
-| Lema 6.4.1 | `⇉` é fechada por contextos | `par_rstep_ctxt` |
-| Lema 6.4.2 | `σ(x) ⇉ τ(x)` para `x ∈ Var(t)` implica `σ(t) ⇉ τ(t)` | `par_rstep_subst` |
+| Lema 6.4.1 | `⇉` é fechada por contextos paralelos | `par_rstep_parallel_ctxt` |
+| Lema 6.4.2 | `σ(x) ⇉ τ(x)` para `x ∈ Var(t)` implica `σ(t) ⇉ τ(t)`; `⇉` é fechada por substituições | `par_rstep_subst`, `par_rstep_at_subst` |
+| Lema 6.4.3 | Decomposição de um passo paralelo ao longo de posições paralelas | `par_rstep_at_decompose` |
 | Lema 6.4.4 | Lema dos movimentos paralelos | `par_rstep_at_linear` |
 | Teorema 6.3.10 | Em um SRT ortogonal, `⇉` tem a propriedade do diamante | `orthogonal_par_rstep_diamond` |
 | Corolário 6.3.11 | Todo SRT ortogonal é confluente | `orthogonal_imp_confluent` |
@@ -34,7 +35,7 @@ As teorias ficam em `thys/` (sessão `Formalismos`, sobre `HOL`):
 | `Confluence` | Pares críticos, linearidade, redução paralela e sistemas ortogonais (Seções 6.1–6.3) |
 | `Parallel_Closed` | Sistemas paralelamente fechados (Seção 6.4) |
 
-O documento `document/Formalismos Matemáticos.tex` apresenta as provas em português, indicando ao lado de cada enunciado o número no livro e o nome do fato na formalização, com link para o GitHub.
+O documento `document/Formalismos Matemáticos.tex` apresenta as provas em português, indicando ao lado de cada enunciado o número no livro e o nome do fato na formalização, com link para o GitHub. Além das provas, explica a estratégia dos Teoremas 6.3.10 e 6.4.8: cortar o termo nas posições mais externas dos dois passos (`outermost`), fechar a bifurcação em cada pedaço (em que um dos passos contrai a raiz) e recombinar os resultados (`par_peak_outermost`), com figuras em TikZ.
 
 ## Como verificar
 

@@ -350,7 +350,7 @@
 				\draw[pedaco] (1.6,-3.5) -- (1.05,-4.5) -- (2.15,-4.5) -- cycle;
 				\draw[pedaco] (2.6,-3.8) -- (2.2,-4.5) -- (3.0,-4.5) -- cycle;
 				\pontos
-				\node[fora] at (1.9,-2.1) {};
+				\node[fora] at (1.9,-2.1) {}; \node[above=4pt, font=\scriptsize] at (1.9,-2.1) {fora};
 			\end{tikzpicture}
 			\caption{Cortes em \(P_0\).}
 		\end{subfigure}
@@ -362,7 +362,7 @@
 				\draw[pedaco] (-2.1,-3.3) -- (-2.8,-4.5) -- (-1.4,-4.5) -- cycle;
 				\draw[pedaco] (-1.0,-3.6) -- (-1.5,-4.5) -- (-0.5,-4.5) -- cycle;
 				\pontos
-				\node[fora] at (-1.6,-1.8) {};
+				\node[fora] at (-1.6,-1.8) {}; \node[above=4pt, font=\scriptsize] at (-1.6,-1.8) {fora};
 			\end{tikzpicture}
 			\caption{Cortes em \(P_1\).}
 		\end{subfigure}
@@ -446,7 +446,32 @@
 			\[t_i = s\subpos{t_i\termpos{q}}{q \in Q} \parared{}{} s\subpos{u_q}{q \in Q} = u. \qedhere\]
 	\end{proof}
 
-	Assim, basta fechar bifurcações \(t_0 \mathrel{{}^{P_0}{\leftleftarrows}} s \parared{}{P_1} t_1\) com \(\epsilon \in P_0\) (o caso \(\epsilon \in P_1\) é simétrico). Como \(P_0\) é paralelo, \(P_0 = \{\epsilon\}\): \(s = \sigma l\) e \(t_0 = \sigma r\) para uma regra \(l \rightarrow r\). Pense em \(l\) como uma parte de cima fixa, com \(\sigma\) preenchendo os buracos (as variáveis). Cada redex de \(P_1\) cai
+	\begin{figure}[ht]
+		\centering
+		\newcommand{\arvore}[5]{%
+			\begin{scope}[shift={#1}]
+				\draw (0,0) -- (-1.9,-2.6) -- (1.9,-2.6) -- cycle;
+				\node[above] at (0,0) {\(#2\)};
+				\draw[fill=#5] (-0.75,-1.0) -- (-1.6,-2.6) -- (0.1,-2.6) -- cycle;
+				\draw[fill=#5] (0.85,-1.2) -- (0.2,-2.6) -- (1.5,-2.6) -- cycle;
+				\node[font=\scriptsize] at (-0.75,-2.15) {\(#3\)};
+				\node[font=\scriptsize] at (0.85,-2.2) {\(#4\)};
+			\end{scope}}
+		\begin{tikzpicture}[scale=0.85]
+			\arvore{(0,0)}{s}{s|_{q_1}}{s|_{q_2}}{gray!25}
+			\arvore{(-4.2,-3.3)}{t_0}{t_0|_{q_1}}{t_0|_{q_2}}{gray!25}
+			\arvore{(4.2,-3.3)}{t_1}{t_1|_{q_1}}{t_1|_{q_2}}{gray!25}
+			\arvore{(0,-6.6)}{u}{u_{q_1}}{u_{q_2}}{gray!50}
+			\draw[->] (-1.3,-1.3) -- node[above left] {\(P_0\)} (-3.7,-2.9);
+			\draw[->] (1.3,-1.3) -- node[above right] {\(P_1\)} (3.7,-2.9);
+			\draw[->, dashed] (-2.8,-4.7) -- (-0.6,-6.4);
+			\draw[->, dashed] (2.8,-4.7) -- (0.6,-6.4);
+		\end{tikzpicture}
+		\caption{Fechamento de uma bifurcação (\Cref{lemma:outermost}), com \(Q = \{q_1, q_2\}\); as setas são passos paralelos. Fora dos pedaços, \(s\), \(t_0\) e \(t_1\) coincidem (\Cref{lemma:decompose}). Em cada pedaço, um dos passos contrai a raiz, e fecha-se a bifurcação \(t_0|_q \leftleftarrows s|_q \rightrightarrows t_1|_q\) num termo \(u_q\). Colocando cada \(u_q\) no lugar do pedaço, obtém-se \(u := s\subpos{u_q}{q \in Q}\), com \(t_0 \rightrightarrows u\) e \(t_1 \rightrightarrows u\) (\Cref{lemma:nested}).}
+		\label{fig:fechamento}
+	\end{figure}
+
+	Assim (Figura~\ref{fig:fechamento}), basta fechar bifurcações \(t_0 \mathrel{{}^{P_0}{\leftleftarrows}} s \parared{}{P_1} t_1\) com \(\epsilon \in P_0\) (o caso \(\epsilon \in P_1\) é simétrico). Como \(P_0\) é paralelo, \(P_0 = \{\epsilon\}\): \(s = \sigma l\) e \(t_0 = \sigma r\) para uma regra \(l \rightarrow r\). Pense em \(l\) como uma parte de cima fixa, com \(\sigma\) preenchendo os buracos (as variáveis). Cada redex de \(P_1\) cai
 	\begin{itemize}
 		\item na parte de cima de \(l\): é uma sobreposição com \(l \rightarrow r\), isto é, um par crítico (\Cref{lemma:overlap}); é só aqui que entram as hipóteses sobre \(R\) (ortogonal ou paralelamente fechado);
 		\item ou dentro de um buraco \(\sigma(x)\): então \(P_1\) só troca o conteúdo dos buracos, e, se \(l\) é linear, \(t_1 = \tau l\) com \(\sigma(x) \parared{}{} \tau(x)\) (\Cref{lemma:6.4.4}); logo \(t_1 \rightarrow \tau r\) e \(t_0 = \sigma r \parared{}{} \tau r\).

@@ -16,6 +16,7 @@
 \usepackage{wrapfig}
 %\usepackage{natbib}
 \usepackage{footnote}
+\usepackage{tikz}
 \usepackage{booktabs, ctable}
 \usepackage{enumerate}
 \usepackage{array}
@@ -221,7 +222,7 @@
 			\[\sigma(l_1\termpos{p}) = \sigma_1(l_1\termpos{p}) = \sigma_2 l_2 = \sigma_2(\pi l_2') = \sigma l_2'.\]
 		Logo \(\sigma\) unifica \(l_1\termpos{p}\) e \(l_2'\), e existem um unificador mais geral \(\theta\) de \(l_1\termpos{p} \stackrel{?}{=} l_2'\) e uma substituição \(\delta\) com \(\sigma = \delta \circ \theta\) (Teorema 4.5.8; \isa{mgu_exists_pair}). Como \(l_1 \rightarrow r_1\) é variante de si mesma, \(l_2' \rightarrow r_2'\) é variante de \(l_2 \rightarrow r_2\), as duas não têm variáveis em comum e não vale \(p = \epsilon\) e \(l_1 \rightarrow r_1 = l_2 \rightarrow r_2\), o par
 			\[\langle u, v\rangle := \langle \theta r_1,\ (\theta l_1)\subpos{\theta r_2'}{p}\rangle\]
-		é crítico (\isa{CPI}). Por fim, \(\delta u = \sigma r_1 = \sigma_1 r_1\) e, como \(\delta(s\subpos{t}{p}) = (\delta s)\subpos{\delta t}{p}\) para \(p \in \pos{s}\) (\isa{replace_at_subst_apply}),
+		é crítico (\isa{CPI}). Por fim, \(\delta u = \sigma r_1 = \sigma_1 r_1\) e, como \(\delta(s\subpos{t}{p}) = (\delta s)\subpos{\delta t}{p}\) para \(p \in \pos{s}\) (pelo lema \isa{replace_at_subst_apply}),
 			\[\delta v = (\sigma l_1)\subpos{\sigma r_2'}{p} = (\sigma_1 l_1)\subpos{\sigma_2(\pi r_2')}{p} = (\sigma_1 l_1)\subpos{\sigma_2 r_2}{p}. \qedhere\]
 	\end{proof}
 
@@ -270,26 +271,24 @@
 
 	Passos paralelos em subtermos paralelos se combinam num único passo paralelo.
 
-	\begin{lemma}[\isa{par_rstep_at_nested}]
+	\begin{lemma}[\isa{par_rstep_at_nested}, \isa{par_rstep_replace_at_set}]
 		\label{lemma:nested}
-		Seja \(P \subseteq \pos{s}\) um conjunto paralelo e, para cada \(p \in P\), seja \(s\termpos{p} \parared{}{Q_p} u_p\). Então
-			\[s \parared{}{Q} s\subpos{u_p}{p \in P}, \qquad Q := \{pq \mid p \in P,\ q \in Q_p\}.\]
+		Seja \(P \subseteq \pos{s}\) um conjunto paralelo e, para cada \(p \in P\), seja \(s\termpos{p} \parared{}{Q_p} u_p\). Defina \(Q := \{pq \mid p \in P,\ q \in Q_p\}\). Segue que
+			\[s \parared{}{Q} s\subpos{u_p}{p \in P}.\]
+		Em particular, se \(s\termpos{p} \parared{}{} u_p\) para todo \(p \in P\), então \(s \parared{}{} s\subpos{u_p}{p \in P}\).
 	\end{lemma}
 	\begin{proof}
-		Pela definição de passo paralelo, cada \(Q_p \subseteq \pos{s\termpos{p}}\) é paralelo e, para \(q \in Q_p\), \((s\termpos{p})\termpos{q} = \sigma_{pq} l_{pq}\) com \(l_{pq} \rightarrow r_{pq} \in R\), e \(u_p = (s\termpos{p})\subpos{\sigma_{pq} r_{pq}}{q \in Q_p}\).
-		\begin{enumerate}
+		Pela definição de passo paralelo, cada \(Q_p \subseteq \pos{s\termpos{p}}\) é paralelo e, para todo \(q \in Q_p\), existem \(l_{pq} \rightarrow r_{pq} \in R\) e \(\sigma_{pq}\) tais que 
+		\begin{equation}
+			(s\termpos{p})\termpos{q} = \sigma_{pq} l_{pq} \quad \text{e} \quad u_p = (s\termpos{p})\subpos{\sigma_{pq} r_{pq}}{q \in Q_p}.
+		\end{equation}
+		Além disso, temos que
+		\begin{enumerate}[i)]
 			\item \(Q \subseteq \pos{s}\) é paralelo (\isa{poss_nested}, \isa{parallel_set_nested}). Sejam \(pq \neq p'q'\) em \(Q\). Se \(p \neq p'\), então \(p \parallel p'\), logo \(pq \parallel p'q'\); se \(p = p'\), então \(q \parallel q'\), logo \(pq \parallel pq'\).
-			\item Para \(pq \in Q\), \(s\termpos{pq} = (s\termpos{p})\termpos{q} = \sigma_{pq} l_{pq}\) (\Cref{lemma:paralelo-subst1}, item 1), e o termo \(\sigma_{pq} r_{pq}\) depende só de \(pq\) (se \(pq = p'q'\), então \(p\) e \(p'\) são prefixos comparáveis da mesma posição, logo \(p = p'\)). Logo, por \isa{replace_at_set_nested},
-				\[s \parared{}{Q} s\subpos{\sigma_{pq} r_{pq}}{pq \in Q} = s\subpos{(s\termpos{p})\subpos{\sigma_{pq} r_{pq}}{q \in Q_p}}{p \in P} = s\subpos{u_p}{p \in P}. \qedhere\]
+			\item Q é um conjunto de posições de redexes. De fato, para \(pq \in Q\), \(s\termpos{pq} = (s\termpos{p})\termpos{q} = \sigma_{pq} l_{pq}\) (\Cref{lemma:paralelo-subst1}, item 1), e o termo \(\sigma_{pq} r_{pq}\) depende só de \(pq\) (se \(pq = p'q'\), então \(p\) e \(p'\) são prefixos comparáveis da mesma posição, logo \(p = p'\)). Logo, por \isa{replace_at_set_nested},
+				\[s \parared{}{Q} s\subpos{\sigma_{pq} r_{pq}}{pq \in Q} = s\subpos{(s\termpos{p})\subpos{\sigma_{pq} r_{pq}}{q \in Q_p}}{p \in P} = s\subpos{u_p}{p \in P}.\]
 		\end{enumerate}
-	\end{proof}
-
-	\begin{lemma}[\isa{par_rstep_replace_at_set}]
-		\label{lemma:combine-sub}
-		Seja \(P \subseteq \pos{s}\) um conjunto paralelo. Se \(s\termpos{p} \parared{}{} u_p\) para todo \(p \in P\), então \(s \parared{}{} s\subpos{u_p}{p \in P}\).
-	\end{lemma}
-	\begin{proof}
-		Para cada \(p \in P\), como \(s\termpos{p} \parared{}{} u_p\), existe um conjunto \(Q_p\) com \(s\termpos{p} \parared{}{Q_p} u_p\); fixe um para cada \(p\). Pelo \Cref{lemma:nested}, \(s \parared{}{Q} s\subpos{u_p}{p \in P}\) para \(Q := \{pq \mid p \in P,\ q \in Q_p\}\); em particular, \(s \parared{}{} s\subpos{u_p}{p \in P}\).
+		Para o caso particular, escolha para cada \(p \in P\) um \(Q_p\) com \(s\termpos{p} \parared{}{Q_p} u_p\) e aplique o anterior.
 	\end{proof}
 
 	\begin{lemma}[6.4.1; \isa{par_rstep_parallel_ctxt}]
@@ -298,8 +297,10 @@
 			\[s\subpos{s_p}{p \in P} \parared{}{} s\subpos{t_p}{p \in P}.\]
 	\end{lemma}
 	\begin{proof}
-		Seja \(s' := s\subpos{s_p}{p \in P}\). Como \(P\) é paralelo, cada \(p \in P\) continua sendo uma posição de \(s'\), com \(s'\termpos{p} = s_p\) (\isa{poss_replace_at_set_subset}, \isa{replace_at_set_subt_at}). Pelo \Cref{lemma:combine-sub}, \(s' \parared{}{} s'\subpos{t_p}{p \in P}\). Por fim, substituir duas vezes nas mesmas posições equivale a substituir só a segunda vez (\isa{replace_at_set_overwrite}):
-			\[s'\subpos{t_p}{p \in P} = s\subpos{t_p}{p \in P}. \qedhere\]
+		Seja \(s' := s\subpos{s_p}{p \in P}\). Como \(P\subseteq \pos{s}\) é paralelo, cada \(p \in P\) continua sendo uma posição de \(s'\), visto que \(s'\termpos{p} = s_p\) (\isa{poss_replace_at_set_subset}, \isa{replace_at_set_subt_at}). Pelo \Cref{lemma:nested}, \(s' \parared{}{} s'\subpos{t_p}{p \in P}\). Por fim, substituir duas vezes nas mesmas posições equivale a substituir só a segunda vez (\isa{replace_at_set_overwrite}):
+			\[s'\subpos{t_p}{p \in P} = s\subpos{t_p}{p \in P}.\]
+		Daí 
+		\[s\subpos{s_p}{p\in P}= s' \parared{}{} s'\subpos{t_p}{p \in P}=s\subpos{t_p}{p \in P}.\]
 	\end{proof}
 
 	\begin{lemma}[6.4.2; \isa{par_rstep_subst}, \isa{par_rstep_at_subst}]
@@ -314,7 +315,7 @@
 	\begin{proof}
 		Como \(s\subpos{t_p}{p \in \emptyset} = s\), temos \(s \parared{}{\emptyset} s\) (\isa{par_rstep_at_empty}, \isa{par_rstep_refl}).
 		\begin{enumerate}
-			\item Seja \(Q\) o conjunto das posições de variável de \(t\) (\isa{var_poss}); \(Q \subseteq \pos{\sigma t}\) é paralelo (\isa{parallel_set_var_poss}). Para \(q \in Q\), com \(t\termpos{q} = x \in \vars{t}\), temos \((\sigma t)\termpos{q} = \sigma(x) \parared{}{} \tau(x) = \tau(t\termpos{q})\). Pelo \Cref{lemma:combine} (com \isa{replace_at_set_id}),
+			\item Seja \(Q\) o conjunto das posições de variável de \(t\) (\isa{var_poss}). Pelo lema \isa{parallel_set_var_poss}, \(Q \subseteq \pos{\sigma t}\) é paralelo. Para \(q \in Q\), com \(t\termpos{q} = x \in \vars{t}\), temos \((\sigma t)\termpos{q} = \sigma(x) \parared{}{} \tau(x) = \tau(t\termpos{q})\). Pelo \Cref{lemma:combine} (com \isa{replace_at_set_id}),
 				\[\sigma t = (\sigma t)\subpos{\sigma(t\termpos{q})}{q \in Q} \parared{}{} (\sigma t)\subpos{\tau(t\termpos{q})}{q \in Q} = \tau t.\]
 			A última igualdade vale pois \(\sigma t\) e \(\tau t\) têm o mesmo esqueleto \(t\) e diferem só nos subtermos \(\sigma(x)\), \(\tau(x)\) nas posições de variável (\isa{replace_at_set_var_poss}).
 			\item Como \(s \parared{}{P} t\), para cada \(p \in P\) há \(l_p \rightarrow r_p \in R\) e \(\sigma_p\) com \(s\termpos{p} = \sigma_p l_p\), e \(t = s\subpos{\sigma_p r_p}{p \in P}\). As posições de \(P\) continuam sendo posições de \(\sigma s\) (\isa{poss_subst_apply}), com redexes das mesmas regras: \((\sigma s)\termpos{p} = \sigma(s\termpos{p}) = (\sigma \circ \sigma_p) l_p\) (\isa{subt_at_subst_apply}). Logo
@@ -323,7 +324,34 @@
 		\end{enumerate}
 	\end{proof}
 
-	Escrevemos \(t_0 \mathrel{{}^{P_0}{\leftleftarrows}} s \parared{}{P_1} t_1\), e chamamos isso de uma {\em bifurcação}, quando \(s \parared{}{P_0} t_0\) e \(s \parared{}{P_1} t_1\). As provas dos Teoremas 6.3.10 e 6.4.8 reduzem uma bifurcação às bifurcações abaixo das posições mais externas de \(P_0 \cup P_1\), nas quais um dos passos contrai o redex na raiz.
+	Escrevemos \(t_0 \mathrel{{}^{P_0}{\leftleftarrows}} s \parared{}{P_1} t_1\), e chamamos isso de uma {\em bifurcação}, quando \(s \parared{}{P_0
+	} t_0\) e \(s \parared{}{P_1} t_1\). As provas dos Teoremas 6.3.10 e 6.4.8 fecham uma bifurcação cortando \(s\) em subtermos que não se tocam, fechando a bifurcação em cada um e recombinando os resultados. Os cortes são feitos nas posições de \(P_0 \cup P_1\) que não estão abaixo de nenhuma outra (Figura~\ref{fig:outermost}).
+
+	\begin{figure}[ht]
+		\centering
+		\begin{tikzpicture}[scale=0.8,
+				p0/.style={circle, fill=black, inner sep=1.8pt},
+				p1/.style={circle, draw=black, fill=white, inner sep=1.8pt}]
+			\draw (0,0) -- (-4,-4.5) -- (4,-4.5) -- cycle;
+			\node[above] at (0,0) {\(s\)};
+			\fill[gray!25] (-1.6,-1.8) -- (-3.2,-4.5) -- (0,-4.5) -- cycle;
+			\draw (-1.6,-1.8) -- (-3.2,-4.5) -- (0,-4.5) -- cycle;
+			\fill[gray!25] (1.9,-2.1) -- (0.5,-4.5) -- (3.3,-4.5) -- cycle;
+			\draw (1.9,-2.1) -- (0.5,-4.5) -- (3.3,-4.5) -- cycle;
+			\node[p0] at (-1.6,-1.8) {};
+			\node[left=3pt] at (-1.6,-1.8) {\(q_1\)};
+			\node[p1] at (-2.1,-3.3) {};
+			\node[p1] at (-1.0,-3.6) {};
+			\node[p1] at (1.9,-2.1) {};
+			\node[right=3pt] at (1.9,-2.1) {\(q_2\)};
+			\node[p0] at (1.6,-3.5) {};
+			\node[p0] at (2.4,-3.9) {};
+			\node[p0] at (5.4,-1.6) {}; \node[right=2pt] at (5.4,-1.6) {posição de \(P_0\)};
+			\node[p1] at (5.4,-2.3) {}; \node[right=2pt] at (5.4,-2.3) {posição de \(P_1\)};
+		\end{tikzpicture}
+		\caption{Os cortes em \(q_1\) e \(q_2\), as posições mais externas de \(P_0 \cup P_1\). Elas são paralelas, logo os pedaços (em cinza) não se tocam e se recombinam (\Cref{lemma:nested}); todo redex dos dois passos está num pedaço, logo nada muda fora deles; e cada uma está em \(P_0\) ou em \(P_1\), logo em cada pedaço um dos passos contrai a raiz. Cortar só em \(P_0\) deixaria de fora o redex em \(q_2\); cortar só em \(P_1\) cortaria abaixo do redex em \(q_1\).}
+		\label{fig:outermost}
+	\end{figure}
 
 	\begin{definition}[\isa{outermost}]
 		As {\em posições mais externas} de um conjunto de posições \(S\) são \(S^{\uparrow} := \{p \in S \mid \text{não existe } q \in S \text{ com } q < p\}\).
@@ -334,6 +362,8 @@
 	\end{remark}
 
 	Claramente \(S^{\uparrow} \subseteq S\) (\isa{outermost_subset}). O conjunto \(S^{\uparrow}\) é paralelo (\isa{parallel_set_outermost}): se \(p, q \in S^{\uparrow}\) fossem distintas e não paralelas, uma seria prefixo próprio da outra, digamos \(q < p\), contradizendo \(p \in S^{\uparrow}\). Além disso, para toda \(p \in S\) existe \(q \in S^{\uparrow}\) com \(q \leq p\) (\isa{outermost_exists}). Por indução forte no comprimento de \(p\): se \(p \in S^{\uparrow}\), tome \(q := p\); caso contrário, existe \(q \in S\) com \(q < p\), e como \(q\) é mais curta que \(p\), a hipótese de indução dá \(q' \in S^{\uparrow}\) com \(q' \leq q < p\).
+
+	Resta ver que um passo paralelo se decompõe ao longo de um tal \(Q\).
 
 	\begin{lemma}[6.4.3; \isa{par_rstep_at_decompose}]
 		\label{lemma:decompose}
@@ -388,6 +418,12 @@
 		{\em Segunda afirmação} (\isa{par_peak_outermost}). Fixe \(i \in \{0, 1\}\). Aplicamos o \Cref{lemma:combine} ao termo \(s\), com o conjunto paralelo \(Q \subseteq \pos{s}\) e, para cada \(q \in Q\), o passo \(t_i\termpos{q} \parared{}{} u_q\) dado pela hipótese. Isso dá \(s\subpos{t_i\termpos{q}}{q \in Q} \parared{}{} s\subpos{u_q}{q \in Q}\), e, usando a primeira parte acima para reescrever o lado esquerdo,
 			\[t_i = s\subpos{t_i\termpos{q}}{q \in Q} \parared{}{} s\subpos{u_q}{q \in Q} = u. \qedhere\]
 	\end{proof}
+
+	Assim, basta fechar bifurcações \(t_0 \mathrel{{}^{P_0}{\leftleftarrows}} s \parared{}{P_1} t_1\) com \(\epsilon \in P_0\) (o caso \(\epsilon \in P_1\) é simétrico). Como \(P_0\) é paralelo, \(P_0 = \{\epsilon\}\): \(s = \sigma l\) e \(t_0 = \sigma r\) para uma regra \(l \rightarrow r\). Pense em \(l\) como uma parte de cima fixa, com \(\sigma\) preenchendo os buracos (as variáveis). Cada redex de \(P_1\) cai
+	\begin{itemize}
+		\item na parte de cima de \(l\): é uma sobreposição com \(l \rightarrow r\), isto é, um par crítico (\Cref{lemma:overlap}); é só aqui que entram as hipóteses sobre \(R\) (ortogonal ou paralelamente fechado);
+		\item ou dentro de um buraco \(\sigma(x)\): então \(P_1\) só troca o conteúdo dos buracos, e, se \(l\) é linear, \(t_1 = \tau l\) com \(\sigma(x) \parared{}{} \tau(x)\) (\Cref{lemma:6.4.4}); logo \(t_1 \rightarrow \tau r\) e \(t_0 = \sigma r \parared{}{} \tau r\).
+	\end{itemize}
 
 	\begin{lemma}[6.4.4; \isa{par_rstep_at_linear}]
 		\label{lemma:6.4.4}
@@ -486,14 +522,14 @@
 		e o seu tamanho é \(|s|_{P_0 \sqcap P_1}| := \sum_{p \in P_0 \sqcap P_1} |s\termpos{p}|\). Note que \(P_0 \sqcap P_1\) é um {\em conjunto}: uma posição em \(P_0 \cap P_1\) é contada uma única vez. A notação \(|s|_{P_0 \sqcap P_1}|\) é apenas um nome para essa soma, e não o tamanho de um subtermo. Como \(P_0 \sqcap P_1 = P_1 \sqcap P_0\), temos \(|s|_{P_0 \sqcap P_1}| = |s|_{P_1 \sqcap P_0}|\) (\isa{overlap_sym}, \isa{overlap_size_sym}).
 	\end{definition}
 
-	\begin{lemma}[6.4.7; \isa{sum_term_size_parallel}, \isa{overlap_size_le}, \isa{overlap_size_root}, \isa{overlap_size_outermost}]
+	\begin{lemma}[6.4.7]
 		\label{lemma:6.4.7}
 		Sejam \(P_0, P_1 \subseteq \pos{s}\) paralelos.
 		\begin{enumerate}
-			\item Se \(P\) é um conjunto paralelo de posições de \(t\), então \(\sum_{p \in P} |t\termpos{p}| \leq |t|\).
-			\item \(|s|_{P_0 \sqcap P_1}| \leq \sum_{p \in P_0} |s\termpos{p}|\).
-			\item Se \(P_0 = \{\epsilon\}\), então \(\sum_{p \in P_1} |s\termpos{p}| \leq |s|_{P_0 \sqcap P_1}|\).
-			\item Para toda posição \(q\), \(|(s\termpos{q})|_{(P_0/q) \sqcap (P_1/q)}| \leq |s|_{P_0 \sqcap P_1}|\).
+			\item (\isa{sum_term_size_parallel}) Se \(P\) é um conjunto paralelo de posições de \(t\), então \(\sum_{p \in P} |t\termpos{p}| \leq |t|\).
+			\item (\isa{overlap_size_le}) \(|s|_{P_0 \sqcap P_1}| \leq \sum_{p \in P_0} |s\termpos{p}|\).
+			\item (\isa{overlap_size_root}) Se \(P_0 = \{\epsilon\}\), então \(\sum_{p \in P_1} |s\termpos{p}| \leq |s|_{P_0 \sqcap P_1}|\).
+			\item (\isa{overlap_size_outermost}) Para toda posição \(q\), \(|(s\termpos{q})|_{(P_0/q) \sqcap (P_1/q)}| \leq |s|_{P_0 \sqcap P_1}|\).
 		\end{enumerate}
 	\end{lemma}
 	\begin{proof}
@@ -534,7 +570,7 @@
 				\item \(s' \parared{}{P'} t_0\): pelo \Cref{lemma:overlap} (com \(l_1 \rightarrow r_1 := l \rightarrow r\), \(l_2 \rightarrow r_2 := l_q \rightarrow r_q\), \(p := q\), \(\sigma_1 := \sigma\), \(\sigma_2 := \sigma_q\)), existem \(\langle u_1, u_2\rangle \in \CP{R}\) e \(\delta\) com \(\delta u_1 = \sigma r = t_0\) e \(\delta u_2 = (\sigma l)\subpos{\sigma_q r_q}{q} = s'\). Como \(R\) é paralelamente fechado, \(u_2 \parared{}{} u_1\), e pelo \Cref{lemma:par-closed}(2) (\isa{par_rstep_subst_closed}), \(s' = \delta u_2 \parared{}{} \delta u_1 = t_0\); seja \(P'\) o conjunto de posições desse passo.
 				\item \(s' \parared{}{P_1 \setminus \{q\}} t_1\): \(P_1 \setminus \{q\} \subseteq P_1\) é paralelo e, como \(q \in P_1\), toda \(w \in P_1 \setminus \{q\}\) é paralela a \(q\). Logo \(w \in \pos{s'}\) (\isa{parallel_poss_replace_at}) e, pelo \Cref{lemma:paralelo-subst1}(4), \(s'\termpos{w} = s\termpos{w} = \sigma_w l_w\). Contraindo esses redexes,
 					\[s'\subpos{\sigma_w r_w}{w \in P_1 \setminus \{q\}} = s\subpos{\sigma_q r_q}{q}\subpos{\sigma_w r_w}{w \in P_1 \setminus \{q\}} = s\subpos{\sigma_w r_w}{w \in P_1} = t_1 \quad (\isa{replace_par_insert}).\]
-				\item A sobreposição diminui: pelos itens (2) e (3) do \Cref{lemma:6.4.7}, e como \(|s\termpos{q}| \geq 1\),
+				\item A sobreposição diminui: pelos itens (2) e (3) do \Cref{lemma:6.4.7}, por \(s'\termpos{w} = s\termpos{w}\) (item anterior) e como \(|s\termpos{q}| \geq 1\),
 					\[|s'|_{(P_1 \setminus \{q\}) \sqcap P'}| \overset{(2)}{\leq} \sum_{w \in P_1 \setminus \{q\}} |s'\termpos{w}| = \sum_{w \in P_1 \setminus \{q\}} |s\termpos{w}| < \sum_{w \in P_1} |s\termpos{w}| \overset{(3)}{\leq} |s|_{P_0 \sqcap P_1}|.\]
 			\end{itemize}
 			Pela hipótese do lema (que, no Teorema 6.4.8, é a hipótese de indução forte em \(|s|_{P_0 \sqcap P_1}|\)), aplicada à bifurcação \(t_1 \mathrel{{}^{P_1 \setminus \{q\}}{\leftleftarrows}} s' \parared{}{P'} t_0\), existe \(u\) com \(t_1 \parared{}{} u\) e \(t_0 \parared{}{} u\). \qedhere
